@@ -51,3 +51,9 @@ void hw_detect();
 void hw_describe(char* buf);
 
 const char* hw_profile_name(HwProfile p);
+
+// First picture level for the adaptive rate (VBLs per picture: 1 = 60, 2 = 30, 3 = 20 at 60 Hz).
+// [HYPOTHESIS] Every profile starts at 2 (30 pictures/s): the adaptive manager then moves from
+// what each picture really costs, so the start only decides the first ~3 s. No MHz table is
+// trusted until a real CT60 run has measured the cost per picture (PERFORMANCE_PROFILES.md).
+int hw_start_level();

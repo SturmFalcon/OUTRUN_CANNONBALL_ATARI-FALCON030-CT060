@@ -79,6 +79,9 @@
       vsync_lat     1   with vsync on: VBLs between the end of a step period and the picture of
                         that step (0..3). 0 = least delay, but a picture finished late misses
                         its VBL; 1 lets a picture take up to 1.5 step periods.
+      vrate     0   pictures per second when vsync is on: 0 = AUTO (chosen from the measured
+                    cost of each picture, with hysteresis), or 60, 30, 20, 15 fixed. The game
+                    speed never changes (one logic step per two VBLs at 60 Hz).
       rompath   roms\  folder of the ROM files, relative to the program (default roms\). A single
                         '.' means the program's own folder, for the ROMs and for tilemap.bin and
                         tilepatch.bin (used by the test bench, which puts every file next to
@@ -121,6 +124,7 @@ struct AtariOptions
     int vsync;                            // 0 off, 1 on, 2 = on with a 55-65 Hz display (default)
     int vsync_lat;                        // VBLs between the end of a step and its picture (0..3)
     char rompath[64];                     // "" = default roms\ ; "." = the program's folder
+    int vrate;                            // pictures/s with vsync: 0 = AUTO (default), 60, 30, 20, 15
 };
 
 // Joystick sources the joy_* options can name.

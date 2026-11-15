@@ -136,6 +136,52 @@ static void quit_func(int code)
     Pterm(code);
 }
 
+// Step split in two halves for the VBL-paced display (see Outrun::tick_part()): set by
+#ifdef STATE_CRC
+// Test aid (-DSTATE_CRC, with -DAUTOPLAY): checksum of the game state after every complete
+// step, written at steps 300, 600, 900 and 1200 to JOURNAUX\\STATECRC.LOG, then the program
+// quits. Two builds or loops that step the game the same way give the same lines, whatever
+// their picture rate: proof that the display pacing does not change the game.
+#include "engine/ostats.hpp"
+static void state_crc_step()
+{
+    static uint32_t crc = 0x12345678u, steps = 0;
+    const uint32_t v[6] = { oroad.road_pos, (uint32_t)oinitengine.car_increment, (uint32_t)(uint16_t)oinitengine.car_x_pos,
+                            ostats.score, (uint32_t)(uint16_t)ostats.time_counter, (uint32_t)outrun.game_state };
+    for (int i = 0; i < 6; i++) { crc ^= v[i]; crc = (crc << 5) | (crc >> 27); crc *= 0x9E3779B1u; }
+    steps++;
+    if (steps % 300 == 0)
+    {
+        Dcreate("JOURNAUX");
+        FILE* f = fopen("JOURNAUX\\STATECRC.LOG", "a");
+        if (f) { fprintf(f, "STATECRC step=%lu crc=%08lx road_pos=%08lx score=%lu state=%d\r\n", (unsigned long)steps, (unsigned long)crc,
+                         (unsigned long)oroad.road_pos, (unsigned long)ostats.score, (int)outrun.game_state); fclose(f); }
+        printf("STATECRC step=%lu crc=%08lx\r\n", (unsigned long)steps, (unsigned long)crc);
+        if (steps >= 1200) { fflush(stdout); state = STATE_QUIT; }
+    }
+}
+#define STATE_CRC_STEP() state_crc_step()
+#else
+#define STATE_CRC_STEP() ((void)0)
+#endif
+
+// main_loop_vsync(); tick() then runs only the first half of a game step and tick_half2()
+// the rest, so that a picture can be shown after each of the arcade's two vertical interrupts.
+static bool g_split = false;
+static bool g_half_pending = false;
+
+static void tick_half2()
+{
+    if (!g_half_pending) return;
+    g_half_pending = false;
+    outrun.tick_part(tick_frame, 1);
+    if (tick_frame) input.frame_done();
+    STATE_CRC_STEP();
+#ifndef NO_SOUND
+    if (!audio.irq_mode()) { audio.fm_before_driver(); osoundint.tick(); }
+#endif
+}
+
 // No event queue on this target: input.frame_done() polls the keyboard
 // state maintained by the IKBD vector directly (see atari/input.cpp)
 // instead of draining an SDL event queue.
@@ -209,11 +255,20 @@ static void tick()
 #ifdef PERF_PRINT
                 uint32_t q0 = PERF_NOW();
 #endif
+                if (g_split)
+                {
+                    // VBL-paced display (main_loop_vsync): the second half of the step, and what
+                    // follows it here, runs one VBL later in tick_half2(), after a picture.
+                    outrun.tick_part(tick_frame, 0);
+                    g_half_pending = true;
+                    break;
+                }
                 outrun.tick(tick_frame);
 #ifdef PERF_PRINT
                 uint32_t q1 = PERF_NOW();
 #endif
                 if (tick_frame) input.frame_done();
+                STATE_CRC_STEP();
 #ifndef NO_SOUND   // -DNO_SOUND also skips the engine's own sound command processing
                 if (!audio.irq_mode()) { audio.fm_before_driver(); osoundint.tick(); }   // else the sound interrupt runs it (atari/audio.cpp)
 #ifdef AUTOPLAY_MUSICSWAP
@@ -552,7 +607,7 @@ static void main_loop()
             static int last_f = 0;
             if (renders == BENCH_START) { b_hz = *hz200; b_frame = cannonball::frame; last_p = p1; if (cadlog_install()) cadlog_reset();
 #ifdef STWRITE_COUNT
-                { extern uint32_t g_st_longs, g_st_rows; g_st_longs = g_st_rows = 0; }
+                { extern uint32_t g_st_longs, g_st_rows, g_st_words; g_st_longs = g_st_rows = g_st_words = 0; }
 #endif
             }
             else if (renders > BENCH_START && renders <= BENCH_START + BENCH_N)
@@ -581,8 +636,8 @@ static void main_loop()
                     char hw[256]; hw_describe(hw); printf("%s%c%c", hw, 13, 10);
                     printf("VSYNC on=%d hz_x100=%lu lat=%d%c%c", (int)g_vsync_on, (unsigned long)g_vsync_hz_x100, atari_opt.vsync_lat, 13, 10);
 #ifdef STWRITE_COUNT
-                    extern uint32_t g_st_longs, g_st_rows;
-                    printf("STWRITE bytes_per_pic=%lu rows_per_pic=%lu%c%c", (unsigned long)(g_st_longs * 4 / BENCH_N), (unsigned long)(g_st_rows / BENCH_N), 13, 10);
+                    extern uint32_t g_st_longs, g_st_rows, g_st_words;
+                    printf("STWRITE bytes_per_pic=%lu changed_word_bytes_per_pic=%lu rows_per_pic=%lu%c%c", (unsigned long)(g_st_longs * 4 / BENCH_N), (unsigned long)(g_st_words * 2 / BENCH_N), (unsigned long)(g_st_rows / BENCH_N), 13, 10);
 #endif
                     // The same three lines in JOURNAUX\CBBENCH.LOG (test bench convention: relative path,
                     // one file, appended), so the result survives without a console.
@@ -627,6 +682,216 @@ static void main_loop()
         }
     }
 
+    quit_cleanup();
+}
+
+// ------------------------------------------------------------------------------------------
+// VBL-paced loop (atari/vsync.hpp, outrun.ini vsync; CT60 work, see ADAPTIVE_FPS.md).
+//
+// The arcade runs its logic at 30 Hz but takes a vertical interrupt at 60 Hz: each game step
+// is two halves, Outrun::tick_part(.., 0) (logic, road CPU, first interrupt) and
+// tick_part(.., 1) (second interrupt). Here one half is due per VBL, so the game keeps its
+// speed (two VBLs per step), and a picture is drawn every n halves: n = 1, 2, 3, 4 gives 60,
+// 30, 20, 15 pictures per second, each one on screen exactly n VBLs (vsync_queue shows it at a
+// fixed VBL). Rates that do not divide the VBL rate (40, 50...) would show pictures for 1 then
+// 2 VBLs and are not offered.
+//
+// n is chosen from what the pictures and the halves really cost (Timer C fine clock, 26 us):
+// one level down when the cost of a group of n halves plus its picture no longer fits n VBLs
+// (6 pictures in a row) or two pictures missed their VBL out of the last 16; one level up only
+// after about 3 s in which the slowest recent picture would have fitted the faster level with
+// 20 % to spare. outrun.ini vrate fixes n instead (60, 30, 20, 15).
+// ------------------------------------------------------------------------------------------
+
+// 26.04 us units (Timer C runs from 192 down to 1 between two 200 Hz ticks). Supervisor only.
+static uint32_t fine_now()
+{
+    volatile uint32_t* hz200 = (volatile uint32_t*)0x4BA;
+    volatile uint8_t* tcdr = (volatile uint8_t*)0xFFFFFA23L;
+    uint32_t h1, h2, c;
+    do { h1 = *hz200; c = *tcdr; h2 = *hz200; } while (h1 != h2);
+    if (c == 0 || c > 192) c = 192;
+    return h1 * 192 + (192 - c);
+}
+
+int g_vrate_level = 2;                      // VBLs per picture now in use (for the menu / logs)
+uint32_t g_vsync_missed = 0;                // pictures skipped because the game was a group behind
+
+static void main_loop_vsync()
+{
+    static const int N_MAX = 6;             // 10 pictures/s at 60 Hz
+    const uint32_t vbl_fine = g_vsync_hz_x100 ? 38400u * 100u / g_vsync_hz_x100 : 640u;
+    bool fixed = atari_opt.vrate != 0;
+    int n = fixed ? (atari_opt.vrate >= 60 ? 1 : atari_opt.vrate >= 30 ? 2 : atari_opt.vrate >= 20 ? 3 : 4)
+                  : hw_start_level();
+    int n_min = 1;
+    uint32_t S = g_vbl;                     // VBL slot of the next group's first half
+    uint32_t R = 0, Lh = 0, R_peak = 0, Lh_peak = 0;   // fine units: picture, one half (smoothed / peak)
+    int down_votes = 0, up_count = 0;
+    uint32_t miss_hist = 0;                 // last 32 pictures, bit = 1 if it missed its VBL
+    uint32_t idle = 0;
+    bool audio_on = false;
+    int phase = 0, renders = 0;
+    g_split = true;
+    g_half_pending = false;
+    g_vsync_missed = 0;
+#ifdef BENCH_N
+    uint32_t b_hz = 0, b_steps = 0, b_lvl[N_MAX + 1] = { 0 }, b_missed = 0, b_rmax = 0, b_late = 0;
+    uint32_t b_hist[256] = { 0 };           // picture cost (render + its halves), 1 ms bins
+    double b_rsum = 0; int b_cnt = 0;
+    volatile uint32_t* hz200 = (volatile uint32_t*)0x4BA;
+#endif
+
+    int vrate_seen = atari_opt.vrate;
+    g_vrate_level = n;
+    while (state != STATE_QUIT)
+    {
+        // The options menu changed the rate: a fixed one at once, AUTO from the current level.
+        if (atari_opt.vrate != vrate_seen)
+        {
+            vrate_seen = atari_opt.vrate;
+            fixed = vrate_seen != 0;
+            if (fixed) n = vrate_seen >= 60 ? 1 : vrate_seen >= 30 ? 2 : vrate_seen >= 20 ? 3 : 4;
+            down_votes = up_count = 0;
+            miss_hist = 0;
+            g_vrate_level = n;
+        }
+        // Wait for the group's first VBL (the sound DMA is fed meanwhile).
+        uint32_t w0 = fine_now();
+        while ((int32_t)(g_vbl - S) < 0) audio.service();
+        idle += fine_now() - w0;
+        if ((int32_t)(g_vbl - S) > 6 * N_MAX)
+            S = g_vbl;                      // hopelessly behind: forget the backlog (the game slows)
+
+        // n halves back to back (they only have to be done before the picture).
+        const uint32_t g0 = fine_now();
+        for (int i = 0; i < n && state != STATE_QUIT; i++)
+        {
+            if (phase == 0)
+            {
+                tick();
+                if (atari_opt.sound == 0)      audio_on = false;
+                else if (atari_opt.sound == 1) audio_on = true;
+#ifdef FORCE_SOUND
+                audio.tick();
+#else
+                if (audio_on) audio.tick(); else audio.tick_muted();
+#endif
+            }
+            else
+                tick_half2();
+            phase ^= 1;
+        }
+        const uint32_t g1 = fine_now();
+        const uint32_t lh = (g1 - g0) / n;
+        Lh = (3 * Lh + lh) / 4;
+        Lh_peak -= Lh_peak / 16; if (lh > Lh_peak) Lh_peak = lh;
+        S += n;
+
+        // Sound: on when the last group left enough idle time (as in main_loop()).
+        if (atari_opt.sound == 2)
+        {
+            if (audio_on) audio_on = idle >= 128u * n;
+            else          audio_on = idle >= 640u * n;
+        }
+        idle = 0;
+
+        // A whole group late: no picture this time, the game keeps its pace.
+        if ((int32_t)(g_vbl - S) >= n)
+        {
+            g_vsync_missed++;
+            miss_hist = (miss_hist << 1) | 1;
+#ifdef BENCH_N
+            if (renders >= BENCH_START) b_missed++;
+#endif
+        }
+        else
+        {
+            g_present_vbl = S + atari_opt.vsync_lat;
+            video.prepare_frame();
+            video.render_frame();
+            // queued at or after its VBL: shown one VBL late (or more)
+            const bool late = (int32_t)(g_vbl - g_present_vbl) >= 0;
+            miss_hist = (miss_hist << 1) | (late ? 1u : 0u);
+#ifdef BENCH_N
+            if (late && renders >= BENCH_START) b_late++;
+#endif
+            const uint32_t r = fine_now() - g1;
+            R = (3 * R + r) / 4;
+            R_peak -= R_peak / 16; if (r > R_peak) R_peak = r;
+            renders++;
+#ifdef AUTOSHOT
+            if (renders == 170 || renders == 260) g_take_screenshot = true;
+#endif
+#ifdef BENCH_N
+            if (renders == BENCH_START)
+            {
+                b_hz = *hz200; b_steps = cannonball::frame;
+                if (cadlog_install()) cadlog_reset();
+            }
+            else if (renders > BENCH_START)
+            {
+                const uint32_t cost = r + (g1 - g0);
+                const uint32_t ms = cost * 1000u / 38400u;
+                b_hist[ms < 255 ? ms : 255]++;
+                if (ms > b_rmax) b_rmax = ms;
+                b_rsum += cost * 1000.0 / 38400.0; b_cnt++;
+                b_lvl[n]++;
+            }
+            if (renders == BENCH_START + BENCH_N)
+            {
+                const uint32_t dt = *hz200 - b_hz;
+                uint32_t acc = 0, p95 = 0;
+                for (int k = 0; k < 256; k++) { acc += b_hist[k]; if (acc * 100 >= 95u * (uint32_t)b_cnt) { p95 = k; break; } }
+                CadLog c; cadlog_get(&c);
+                char hw[256]; hw_describe(hw);
+                char l1[256], l2[256], l3[256];
+                std::sprintf(l1, "VBENCH pictures=%d hz200=%lu logic=%lu pics_per_s_x10=%lu cost_ms_avg_x10=%d cost_ms_p95=%lu cost_ms_max=%lu missed=%lu late=%lu",
+                             BENCH_N, (unsigned long)dt, (unsigned long)(cannonball::frame - b_steps), (unsigned long)(BENCH_N * 2000UL / (dt ? dt : 1)),
+                             (int)(b_rsum * 10 / (b_cnt ? b_cnt : 1)), (unsigned long)p95, (unsigned long)b_rmax, (unsigned long)b_missed, (unsigned long)b_late);
+                std::sprintf(l2, "VLEVELS 60=%lu 30=%lu 20=%lu 15=%lu 12=%lu 10=%lu fixed=%d lat=%d hz_x100=%lu",
+                             (unsigned long)b_lvl[1], (unsigned long)b_lvl[2], (unsigned long)b_lvl[3], (unsigned long)b_lvl[4], (unsigned long)b_lvl[5], (unsigned long)b_lvl[6],
+                             (int)fixed, atari_opt.vsync_lat, (unsigned long)g_vsync_hz_x100);
+                std::sprintf(l3, "CADENCE vbls=%lu shown=%lu drawn=%d hold1=%lu hold2=%lu hold3=%lu hold4=%lu hold5=%lu hold6=%lu hold7=%lu hold8+=%lu",
+                             (unsigned long)c.vbls, (unsigned long)c.shown, BENCH_N, (unsigned long)c.hold[1], (unsigned long)c.hold[2], (unsigned long)c.hold[3],
+                             (unsigned long)c.hold[4], (unsigned long)c.hold[5], (unsigned long)c.hold[6], (unsigned long)c.hold[7], (unsigned long)c.hold[8]);
+                printf("%s\r\n%s\r\n%s\r\n%s\r\n", l1, l2, l3, hw);
+#ifdef STWRITE_COUNT
+                extern uint32_t g_st_longs, g_st_rows, g_st_words;
+                printf("STWRITE bytes_per_pic=%lu changed_word_bytes_per_pic=%lu rows_per_pic=%lu\r\n", (unsigned long)(g_st_longs * 4 / renders), (unsigned long)(g_st_words * 2 / renders), (unsigned long)(g_st_rows / renders));
+#endif
+                Dcreate("JOURNAUX");
+                FILE* bl = fopen("JOURNAUX\\CBBENCH.LOG", "a");
+                if (bl) { fprintf(bl, "%s\r\n%s\r\n%s\r\n%s\r\n", l1, l2, l3, hw); fclose(bl); }
+                fflush(stdout);
+                quit_func(0);
+            }
+#endif
+        }
+
+        if (fixed) continue;
+        // Level choice. cost(k) = picture + k halves, against k VBLs.
+        const int missed16 = __builtin_popcount(miss_hist & 0xFFFF);
+        if (R + (uint32_t)n * Lh > (uint32_t)n * vbl_fine || missed16 >= 2)
+        {
+            if (++down_votes >= 6 || missed16 >= 2)
+            {
+                if (n < N_MAX) n++;
+                down_votes = up_count = 0;
+                miss_hist = 0;
+            }
+        }
+        else down_votes = 0;
+        if (n > n_min && (R_peak + (uint32_t)(n - 1) * Lh_peak) * 100 <= 80u * (uint32_t)(n - 1) * vbl_fine)
+        {
+            up_count += n;                  // VBLs spent with room for the faster level
+            if (up_count >= 180) { n--; up_count = down_votes = 0; }
+        }
+        else up_count = 0;
+        g_vrate_level = n;
+    }
+
+    g_split = false;
     quit_cleanup();
 }
 #endif
@@ -835,10 +1100,15 @@ int main(int argc, char* argv[])
     if (atari_opt.vsync && vsync_install())
     {
         g_vsync_hz_x100 = vsync_measure_hz_x100();
-        g_vsync_on = atari_opt.vsync == 1 || (g_vsync_hz_x100 >= 5500 && g_vsync_hz_x100 <= 6500);
+        // automatic: a ~60 Hz display and a 68040/68060 (a 16 MHz 68030 draws a picture in about
+        // a second: nothing to gain, the v0.39 loop stays)
+        g_vsync_on = atari_opt.vsync == 1 || (g_hw.cpu >= 40 && g_vsync_hz_x100 >= 5500 && g_vsync_hz_x100 <= 6500);
         if (!g_vsync_on) vsync_remove();
     }
     g_vsync_idle = vsync_idle;
+#ifndef OLD_PACING
+    if (g_vsync_on) main_loop_vsync(); else
+#endif
 #endif
     main_loop();
     // main_loop() already ran quit_cleanup() (stops the sound DMA, restores the keyboard vector,

@@ -112,3 +112,14 @@ void hw_describe(char* buf)
                  (unsigned long)h.spin_iters, (unsigned long)h.spin_ticks, (unsigned long)h.cycles_per_iter,
                  (unsigned long)(h.mhz_x10 / 10), (unsigned long)(h.mhz_x10 % 10), hw_profile_name(h.profile));
 }
+
+int hw_start_level()
+{
+    switch (g_hw.profile)
+    {
+    case HWP_030:
+    case HWP_040:     return 4;     // not a target of the adaptive loop (vsync needs a 060)
+    case HWP_060_LOW: return 3;
+    default:          return 2;     // 060 at 45 MHz and up: start at 30, measure, adapt
+    }
+}

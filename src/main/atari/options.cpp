@@ -10,7 +10,7 @@
 #include "atari/options.hpp"
 
 AtariOptions atari_opt = { 1, 0, 1, 100, 0, 0, 0, 2, 1, 0, 1, 2, 0, 0, 1,
-                           JOYSRC_UP | JOYSRC_B, JOYSRC_DOWN | JOYSRC_C, JOYSRC_FIRE, 2, 1 };
+                           JOYSRC_UP | JOYSRC_B, JOYSRC_DOWN | JOYSRC_C, JOYSRC_FIRE, 2, 1, "", 0 };
 
 unsigned char g_row_draw[232];
 unsigned char g_row_mask8[232];
@@ -164,6 +164,11 @@ void atari_load_options(const char* filename)
         else if (!strcmp(key, "joy_gear"))     set_joy(&atari_opt.joy_gear,     val);
         else if (!strcmp(key, "vsync"))        set_int(&atari_opt.vsync,        val, 0, 2);
         else if (!strcmp(key, "vsync_lat"))    set_int(&atari_opt.vsync_lat,    val, 0, 3);
+        else if (!strcmp(key, "vrate"))
+        {
+            int v = atoi(val);
+            atari_opt.vrate = (v == 60 || v == 30 || v == 20 || v == 15) ? v : 0;
+        }
         else if (!strcmp(key, "rompath"))
         {
             size_t n = strcspn(val, " \t\r\n");
@@ -194,7 +199,7 @@ bool atari_save_options(const char* filename)
 {
     // the keys and their values, as they are written
     static const char* KEYS[] = { "shadows", "shadow_min_z", "scenery", "vscale", "road_hres", "cadence", "fps",
-                                  "music", "joy_accel", "joy_brake", "joy_gear" };
+                                  "music", "joy_accel", "joy_brake", "joy_gear", "vrate" };
     const int NK = sizeof(KEYS) / sizeof(KEYS[0]);
     char vals[NK][24];
     sprintf(vals[0], "%d", atari_opt.shadows);
@@ -208,6 +213,7 @@ bool atari_save_options(const char* filename)
     atari_joy_name(atari_opt.joy_accel, vals[8]);
     atari_joy_name(atari_opt.joy_brake, vals[9]);
     atari_joy_name(atari_opt.joy_gear, vals[10]);
+    sprintf(vals[11], "%d", atari_opt.vrate);
     bool done[NK];
     for (int k = 0; k < NK; k++) done[k] = false;
 
