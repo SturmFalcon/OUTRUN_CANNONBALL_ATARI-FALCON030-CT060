@@ -18,6 +18,7 @@
 #include <mint/cookie.h>
 #include "atari/video.hpp"
 #include "atari/screenshot.hpp"
+#include "atari/vsync.hpp"
 
 extern "C" void atari_truecolor(const uint16_t* px, const uint16_t* pal, uint16_t* dst, uint32_t blocks4);
 #include "atari/options.hpp"
@@ -391,6 +392,12 @@ void Render::set_shadow_intensity(float f)
 // Shows the buffer just drawn, from the next vertical blank.
 void Render::flip_screen_base()
 {
+    if (g_vsync_on)
+    {
+        // Paced on the VBL (atari/vsync.hpp): shown exactly at the VBL the game loop chose.
+        vsync_queue(screen_buffer[back_buffer], g_present_vbl, g_vsync_idle);
+        return;
+    }
     VsetScreen(-1L, (long)screen_buffer[back_buffer], (short)-1, (short)-1);
 }
 

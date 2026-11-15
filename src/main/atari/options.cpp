@@ -10,7 +10,7 @@
 #include "atari/options.hpp"
 
 AtariOptions atari_opt = { 1, 0, 1, 100, 0, 0, 0, 2, 1, 0, 1, 2, 0, 0, 1,
-                           JOYSRC_UP | JOYSRC_B, JOYSRC_DOWN | JOYSRC_C, JOYSRC_FIRE };
+                           JOYSRC_UP | JOYSRC_B, JOYSRC_DOWN | JOYSRC_C, JOYSRC_FIRE, 2, 1 };
 
 unsigned char g_row_draw[232];
 unsigned char g_row_mask8[232];
@@ -162,6 +162,8 @@ void atari_load_options(const char* filename)
         else if (!strcmp(key, "joy_accel"))    set_joy(&atari_opt.joy_accel,    val);
         else if (!strcmp(key, "joy_brake"))    set_joy(&atari_opt.joy_brake,    val);
         else if (!strcmp(key, "joy_gear"))     set_joy(&atari_opt.joy_gear,     val);
+        else if (!strcmp(key, "vsync"))        set_int(&atari_opt.vsync,        val, 0, 2);
+        else if (!strcmp(key, "vsync_lat"))    set_int(&atari_opt.vsync_lat,    val, 0, 3);
         else if (!strcmp(key, "rompath"))
         {
             size_t n = strcspn(val, " \t\r\n");

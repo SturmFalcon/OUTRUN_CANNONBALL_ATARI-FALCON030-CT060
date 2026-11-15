@@ -70,6 +70,15 @@
                         go through the DSP too (the DAC listens to it alone while this is on).
                         Needs "mod=1"; falls back to CPU mixing if the DSP does not answer or the
                         module has more than 4 channels. Checked in Hatari's DSP emulation only.
+      vsync         2   pictures paced on the vertical blank (atari/vsync.hpp): the game steps are
+                        timed on the VBL, two per step, and each picture is shown at a fixed VBL,
+                        so at 30 pictures/s every picture stays exactly 2 VBLs on screen.
+                        0 = off (v0.39 behaviour: steps on the 200 Hz clock, picture shown at the
+                        VBL after it is finished), 1 = on, 2 = on when the display runs at 55-65 Hz
+                        (VGA), off at 50 Hz. Only read at start-up.
+      vsync_lat     1   with vsync on: VBLs between the end of a step period and the picture of
+                        that step (0..3). 0 = least delay, but a picture finished late misses
+                        its VBL; 1 lets a picture take up to 1.5 step periods.
       rompath   roms\  folder of the ROM files, relative to the program (default roms\). A single
                         '.' means the program's own folder, for the ROMs and for tilemap.bin and
                         tilepatch.bin (used by the test bench, which puts every file next to
@@ -109,6 +118,8 @@ struct AtariOptions
     int mod_dsp;
     int freemint;
     int joy_accel, joy_brake, joy_gear;   // JOYSRC_* bits
+    int vsync;                            // 0 off, 1 on, 2 = on with a 55-65 Hz display (default)
+    int vsync_lat;                        // VBLs between the end of a step and its picture (0..3)
     char rompath[64];                     // "" = default roms\ ; "." = the program's folder
 };
 

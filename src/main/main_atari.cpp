@@ -32,6 +32,7 @@
 #include <mint/cookie.h>
 #include "atari/hwdetect.hpp"
 #include "atari/cadlog.hpp"
+#include "atari/vsync.hpp"
 
 // Stack size requested from the MiNTLib startup code (__stksize).
 extern "C" long __stksize = 262144L;
@@ -97,6 +98,8 @@ static long g_user_ssp = 0;
 static void quit_cleanup()
 {
     cadlog_remove();        // the cadence log's VBL routine, if a bench build installed it
+    g_vsync_on = false;
+    vsync_remove();         // the VBL pacing routine (atari/vsync.hpp), before the screen is put back
     audio.stop_audio();
     dsp_replay.stop();      // hands Timer A, the sound matrix and the DSP back (no-op unless mod_dsp started it)
     dspmod.shutdown();      // same for DSPMOD (mod_dsp = 2)
@@ -382,6 +385,9 @@ static void main_loop()
     quit_func(0);
 }
 #else
+uint32_t g_vsync_hz_x100 = 0;              // measured VBL rate (0 = vsync not used)
+static void vsync_idle() { audio.service(); }
+
 // Fixed-cadence loop (Falcon).  Steps run at their scheduled times, 30 per second; a picture is
 // drawn after every K-th step, K being the smallest number that lets a picture fit in the time
 // of K steps (1 = 30 pictures/s, 2 = 15, ...), so the picture rate is steady and every picture
@@ -393,7 +399,11 @@ static void main_loop()
     const int32_t TICK_UNITS = 20;          // 1/30 s, in units of 1/600 s (hz200 * 3)
     const int     K_MAX      = 4;
     const uint32_t SOUND_UNITS = 10;        // about what one step of synthesis costs on a fast 060 (1/600 s)
-    uint32_t next_tick = *hz200 * 3;
+    // Time in 1/600 s units: the 200 Hz counter x 3, or, with the pictures paced on the VBL
+    // (atari/vsync.hpp), the VBL count x 10 - at ~60 Hz one VBL is ~10 units, so a step
+    // (TICK_UNITS = 20) is exactly two VBLs.
+    #define SCHED_NOW() (g_vsync_on ? g_vbl * 10 : *hz200 * 3)
+    uint32_t next_tick = SCHED_NOW();
     int      K = atari_opt.cadence ? atari_opt.cadence : 2, steps = 0, votes = 0;
     int      pic_acc = 0;                   // pictures owed, in 1/60 units (fps and automatic mode)
     // Automatic mode (cadence = 0, fps = 0): pictures per second in 1/2 units, from 30 down
@@ -411,14 +421,15 @@ static void main_loop()
 
     while (state != STATE_QUIT)
     {
-        uint32_t now = *hz200 * 3;
+        uint32_t now = SCHED_NOW();
         if ((int32_t)(now - next_tick) < 0)
         {
-            if (!waiting) { waiting = true; wait_start = now; }
+            if (!waiting) { waiting = true; wait_start = *hz200 * 3; }
             audio.service();                // ahead of schedule: keep the sound DMA fed
             continue;
         }
-        if (waiting) { idle += now - wait_start; waiting = false; }
+        const uint32_t now_h = *hz200 * 3;    // the same moment on the 200 Hz clock (durations)
+        if (waiting) { idle += now_h - wait_start; waiting = false; }
 #ifndef CATCHUP_STEPS
 #define CATCHUP_STEPS 6
 #endif
@@ -430,7 +441,7 @@ static void main_loop()
         { extern uint32_t g_logic; g_logic++; }
 #endif
         const uint32_t t1 = *hz200 * 3;
-        L = (3 * L + (t1 - now)) / 4;
+        L = (3 * L + (t1 - now_h)) / 4;
 #ifdef FORCE_SOUND
         audio.tick();
 #else
@@ -452,6 +463,9 @@ static void main_loop()
         steps = 0;
 
         const uint32_t p0 = *hz200 * 3;
+        // With VBL pacing: this picture shows the game as of the step just made; it appears
+        // vsync_lat VBLs after that step's period ends (next_tick is the start of the next step).
+        g_present_vbl = next_tick / 10 + atari_opt.vsync_lat;
 #ifdef AUDIO_TIMING
         extern uint32_t g_t_prep, g_t_draw; extern uint32_t atari_fine_time();
         const uint32_t f0 = atari_fine_time();
@@ -565,6 +579,7 @@ static void main_loop()
                            (unsigned long)c.vbls, (unsigned long)c.shown, BENCH_N, (unsigned long)c.hold[1], (unsigned long)c.hold[2], (unsigned long)c.hold[3],
                            (unsigned long)c.hold[4], (unsigned long)c.hold[5], (unsigned long)c.hold[6], (unsigned long)c.hold[7], (unsigned long)c.hold[8], 13, 10);
                     char hw[256]; hw_describe(hw); printf("%s%c%c", hw, 13, 10);
+                    printf("VSYNC on=%d hz_x100=%lu lat=%d%c%c", (int)g_vsync_on, (unsigned long)g_vsync_hz_x100, atari_opt.vsync_lat, 13, 10);
 #ifdef STWRITE_COUNT
                     extern uint32_t g_st_longs, g_st_rows;
                     printf("STWRITE bytes_per_pic=%lu rows_per_pic=%lu%c%c", (unsigned long)(g_st_longs * 4 / BENCH_N), (unsigned long)(g_st_rows / BENCH_N), 13, 10);
@@ -581,6 +596,7 @@ static void main_loop()
                                 (unsigned long)c.vbls, (unsigned long)c.shown, BENCH_N, (unsigned long)c.hold[1], (unsigned long)c.hold[2], (unsigned long)c.hold[3],
                                 (unsigned long)c.hold[4], (unsigned long)c.hold[5], (unsigned long)c.hold[6], (unsigned long)c.hold[7], (unsigned long)c.hold[8]);
                         fprintf(bl, "%s\r\n", hw);
+                        fprintf(bl, "VSYNC on=%d hz_x100=%lu lat=%d\r\n", (int)g_vsync_on, (unsigned long)g_vsync_hz_x100, atari_opt.vsync_lat);
                         fclose(bl);
                     }
                 }
@@ -813,6 +829,17 @@ int main(int argc, char* argv[])
     state = STATE_INIT_MENU; // the options menu first (atari/optmenu.hpp)
 #endif
 
+#ifdef PLATFORM_FALCON
+    // Picture pacing on the VBL (atari/vsync.hpp, outrun.ini vsync): on a ~60 Hz display by default.
+    g_vsync_hz_x100 = 0;
+    if (atari_opt.vsync && vsync_install())
+    {
+        g_vsync_hz_x100 = vsync_measure_hz_x100();
+        g_vsync_on = atari_opt.vsync == 1 || (g_vsync_hz_x100 >= 5500 && g_vsync_hz_x100 <= 6500);
+        if (!g_vsync_on) vsync_remove();
+    }
+    g_vsync_idle = vsync_idle;
+#endif
     main_loop();
     // main_loop() already ran quit_cleanup() (stops the sound DMA, restores the keyboard vector,
     // puts the video mode back) right before returning here - see the STATE_QUIT handling in
