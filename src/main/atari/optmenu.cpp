@@ -363,6 +363,16 @@ int OptMenu::tick()
 {
     frame++;
     if (message) message--;
+#ifdef MENUSHOT
+    // Test aid (-DMENUSHOT): a screenshot of the main page, then of the options page, then EXIT.
+    {
+        extern bool g_take_screenshot;
+        if (frame == 60) g_take_screenshot = true;
+        if (frame == 75) { page = 1; cursor = 0; }
+        if (frame == 100) g_take_screenshot = true;
+        if (frame == 130) return MENU_EXIT;
+    }
+#endif
 
     // up, down, left, right, select (keyboard and joystick); held directions repeat after
     // 12 steps, every 4 steps
