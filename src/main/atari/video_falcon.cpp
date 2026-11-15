@@ -61,7 +61,7 @@ extern "C" void atari_truecolor_diff(const uint16_t* px, uint16_t* shadow, const
 // never is an index, so a copy filled with it makes every pixel be written.
 static uint16_t* shadow[3] = { 0, 0, 0 };
 #ifdef STWRITE_COUNT
-uint32_t g_st_longs = 0, g_st_rows = 0;   // test aid, see convert_rows_diff()
+uint32_t g_st_longs = 0, g_st_rows = 0, g_st_words = 0;   // test aid, see convert_rows_diff()
 #endif
 
 static void shadow_invalidate(int i)
@@ -85,7 +85,14 @@ static void convert_rows_diff(const uint16_t* src, const uint16_t* pal, uint16_t
         {
             const uint32_t* a = (const uint32_t*)src;
             const uint32_t* b = (const uint32_t*)sh;
-            for (int k = 0; k < rows * (S16_WIDTH / 2); k++) if (a[k] != b[k]) g_st_longs++;
+            for (int k = 0; k < rows * (S16_WIDTH / 2); k++)
+                if (a[k] != b[k])
+                {
+                    extern uint32_t g_st_words;
+                    g_st_longs++;
+                    g_st_words += ((a[k] ^ b[k]) & 0xffff0000u) ? 1 : 0;
+                    g_st_words += ((a[k] ^ b[k]) & 0x0000ffffu) ? 1 : 0;
+                }
         }
     }
 #endif
