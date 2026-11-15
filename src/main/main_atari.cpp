@@ -701,6 +701,14 @@ int main(int argc, char* argv[])
 #endif
     hw_detect();                        // CPU, CT60, RAM, measured clock (atari/hwdetect.hpp)
     atari_load_options("outrun.ini");   // optional: shadows, scenery, cadence, sound (see atari/options.hpp)
+    if (atari_opt.rompath[0])
+    {
+        // rompath = . : the ROMs sit next to the program; otherwise the folder given, with a separator.
+        std::string rp = atari_opt.rompath;
+        if (rp == ".") { rp = ""; config.data.res_path = ""; }   // res\*.bin next to the program too
+        else if (rp[rp.size() - 1] != '\\' && rp[rp.size() - 1] != '/') rp += "\\";
+        config.data.rom_path = rp;
+    }
     if (atari_opt.mod)
     {
         void atari_mod_probe();   // atari/modplayer.cpp

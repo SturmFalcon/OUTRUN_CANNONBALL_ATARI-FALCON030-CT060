@@ -70,6 +70,10 @@
                         go through the DSP too (the DAC listens to it alone while this is on).
                         Needs "mod=1"; falls back to CPU mixing if the DSP does not answer or the
                         module has more than 4 channels. Checked in Hatari's DSP emulation only.
+      rompath   roms\  folder of the ROM files, relative to the program (default roms\). A single
+                        '.' means the program's own folder, for the ROMs and for tilemap.bin and
+                        tilepatch.bin (used by the test bench, which puts every file next to
+                        the program).
       freemint      1   1 = ROM set keeps its original filenames (e.g. "epr-10380b.133") - needs
                         FreeMiNT or another long-filename-capable kernel/filesystem on real hardware.
                         0 = look for the 8.3-safe renamed set instead (see README_ATARI.md for the
@@ -105,6 +109,7 @@ struct AtariOptions
     int mod_dsp;
     int freemint;
     int joy_accel, joy_brake, joy_gear;   // JOYSRC_* bits
+    char rompath[64];                     // "" = default roms\ ; "." = the program's folder
 };
 
 // Joystick sources the joy_* options can name.

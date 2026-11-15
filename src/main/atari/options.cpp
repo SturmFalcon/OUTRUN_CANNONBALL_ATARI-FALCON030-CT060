@@ -162,6 +162,13 @@ void atari_load_options(const char* filename)
         else if (!strcmp(key, "joy_accel"))    set_joy(&atari_opt.joy_accel,    val);
         else if (!strcmp(key, "joy_brake"))    set_joy(&atari_opt.joy_brake,    val);
         else if (!strcmp(key, "joy_gear"))     set_joy(&atari_opt.joy_gear,     val);
+        else if (!strcmp(key, "rompath"))
+        {
+            size_t n = strcspn(val, " \t\r\n");
+            if (n >= sizeof(atari_opt.rompath)) n = sizeof(atari_opt.rompath) - 1;
+            memcpy(atari_opt.rompath, val, n);
+            atari_opt.rompath[n] = 0;
+        }
     }
     fclose(f);
     build_rows(atari_opt.vscale);
