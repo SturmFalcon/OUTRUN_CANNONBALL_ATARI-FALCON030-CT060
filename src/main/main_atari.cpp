@@ -738,7 +738,7 @@ static void main_loop_vsync()
 #ifdef BENCH_N
     uint32_t b_hz = 0, b_steps = 0, b_lvl[N_MAX + 1] = { 0 }, b_missed = 0, b_rmax = 0, b_late = 0;
     uint32_t b_hist[256] = { 0 };           // picture cost (render + its halves), 1 ms bins
-    double b_rsum = 0; int b_cnt = 0;
+    double b_rsum = 0, b_r = 0, b_h = 0; int b_cnt = 0;
     volatile uint32_t* hz200 = (volatile uint32_t*)0x4BA;
 #endif
 
@@ -836,6 +836,7 @@ static void main_loop_vsync()
                 b_hist[ms < 255 ? ms : 255]++;
                 if (ms > b_rmax) b_rmax = ms;
                 b_rsum += cost * 1000.0 / 38400.0; b_cnt++;
+                b_r += r * 1000.0 / 38400.0; b_h += (g1 - g0) * 1000.0 / 38400.0 / n;
                 b_lvl[n]++;
             }
             if (renders == BENCH_START + BENCH_N)
@@ -846,9 +847,10 @@ static void main_loop_vsync()
                 CadLog c; cadlog_get(&c);
                 char hw[256]; hw_describe(hw);
                 char l1[256], l2[256], l3[256];
-                std::sprintf(l1, "VBENCH pictures=%d hz200=%lu logic=%lu pics_per_s_x10=%lu cost_ms_avg_x10=%d cost_ms_p95=%lu cost_ms_max=%lu missed=%lu late=%lu",
+                std::sprintf(l1, "VBENCH pictures=%d hz200=%lu logic=%lu pics_per_s_x10=%lu cost_ms_avg_x10=%d cost_ms_p95=%lu cost_ms_max=%lu missed=%lu late=%lu render_ms_x10=%d half_ms_x10=%d",
                              BENCH_N, (unsigned long)dt, (unsigned long)(cannonball::frame - b_steps), (unsigned long)(BENCH_N * 2000UL / (dt ? dt : 1)),
-                             (int)(b_rsum * 10 / (b_cnt ? b_cnt : 1)), (unsigned long)p95, (unsigned long)b_rmax, (unsigned long)b_missed, (unsigned long)b_late);
+                             (int)(b_rsum * 10 / (b_cnt ? b_cnt : 1)), (unsigned long)p95, (unsigned long)b_rmax, (unsigned long)b_missed, (unsigned long)b_late,
+                             (int)(b_r * 10 / (b_cnt ? b_cnt : 1)), (int)(b_h * 10 / (b_cnt ? b_cnt : 1)));
                 std::sprintf(l2, "VLEVELS 60=%lu 30=%lu 20=%lu 15=%lu 12=%lu 10=%lu fixed=%d lat=%d hz_x100=%lu",
                              (unsigned long)b_lvl[1], (unsigned long)b_lvl[2], (unsigned long)b_lvl[3], (unsigned long)b_lvl[4], (unsigned long)b_lvl[5], (unsigned long)b_lvl[6],
                              (int)fixed, atari_opt.vsync_lat, (unsigned long)g_vsync_hz_x100);
