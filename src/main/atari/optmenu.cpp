@@ -29,6 +29,11 @@
 #include "atari/options.hpp"
 #include "atari/input.hpp"
 #include "atari/modplayer.hpp"
+#include "atari/hwdetect.hpp"
+
+// VBL-paced display (main_atari.cpp main_loop_vsync): picture rate in use and the switch.
+extern bool g_vsync_on;
+extern int g_vrate_level;
 
 // atari text layer offsets (hwvideo/hwtiles.cpp)
 extern int8_t g_text_dx[28];
@@ -88,6 +93,10 @@ static int step(int i, int n, int dir)
     if (i < 0) return 0;
     return (i + dir + n) % n;
 }
+
+// With the VBL-paced display (vsync), the rates that divide a 60 Hz display (outrun.ini vrate).
+static const int VRATES[] = { 0, 60, 30, 20, 15 };
+static const int NVRATES = sizeof(VRATES) / sizeof(VRATES[0]);
 
 static int rate_index()
 {
@@ -149,6 +158,11 @@ void OptMenu::change(int line, int dir)
     {
         case L_PICTURES:
         {
+            if (g_vsync_on)
+            {
+                atari_opt.vrate = VRATES[step(find(VRATES, NVRATES, atari_opt.vrate), NVRATES, dir)];
+                break;
+            }
             const int i = step(rate_index(), NRATES, dir);
             atari_opt.cadence = RATES[i].cadence;
             atari_opt.fps = RATES[i].fps;
@@ -265,6 +279,15 @@ void OptMenu::draw()
             if (i == main_cursor)
                 video.write_text32(ohud.translate(x - 3, y), roms.rom0.read32(TILES_MINICARS1));
         }
+        // the processor found at start-up and its MEASURED clock (atari/hwdetect.hpp)
+        {
+            char cpu[32];
+            if (g_hw.mhz_x10) sprintf(cpu, "CPU 680%ld  %lu MHZ", g_hw.cpu, (unsigned long)((g_hw.mhz_x10 + 5) / 10));
+            else sprintf(cpu, "CPU 680%ld", g_hw.cpu);
+            if (g_hw.cpu == 0) strcpy(cpu, "CPU 68000");
+            ohud.blit_text_new(20 - (int)strlen(cpu) / 2, 26, cpu, col);
+            centre_row(26, cpu);
+        }
         return;
     }
     const int y0 = 14;
@@ -276,7 +299,14 @@ void OptMenu::draw()
             case L_PICTURES:
             {
                 const int r = rate_index();
-                if (r >= 0) strcpy(value, RATES[r].name);
+                if (g_vsync_on)
+                {
+                    // AUTO shows the rate it has chosen (60 / number of VBLs per picture)
+                    const int now = g_vrate_level > 0 ? 60 / g_vrate_level : 0;
+                    if (atari_opt.vrate) sprintf(value, "%d", atari_opt.vrate);
+                    else sprintf(value, "AUTO %d", now);
+                }
+                else if (r >= 0) strcpy(value, RATES[r].name);
                 else sprintf(value, "%d", atari_opt.fps ? atari_opt.fps : 30 / (atari_opt.cadence ? atari_opt.cadence : 1));
                 break;
             }
