@@ -201,6 +201,41 @@ void Outrun::tick(bool tick_frame)
         ohud.draw_fps_counter(cannonball::fps_counter);
 }
 
+void Outrun::tick_part(bool tick_frame, int part)
+{
+    if (part == 0)
+    {
+        this->tick_frame = tick_frame;
+        if (tick_frame)
+        {
+            tick_counter++;
+            if (game_state >= GS_START1 && game_state <= GS_INGAME)
+            {
+                if (input.has_pressed(Input::VIEWPOINT))
+                {
+                    int mode = oroad.get_view_mode() + 1;
+                    if (mode > ORoad::VIEW_INCAR)
+                        mode = ORoad::VIEW_ORIGINAL;
+                    oroad.set_view_mode(mode);
+                }
+            }
+        }
+        jump_table();
+        oroad.tick();
+        vint();
+        return;
+    }
+    vint();
+    if (tick_frame)
+    {
+        uint8_t coin = oinputs.do_credits();
+        outputs->coin_chute_out(&outputs->chute1, coin == 1);
+        outputs->coin_chute_out(&outputs->chute2, coin == 2);
+    }
+    if (config.video.fps_count)
+        ohud.draw_fps_counter(cannonball::fps_counter);
+}
+
 // Vertical Interrupt
 void Outrun::vint()
 {

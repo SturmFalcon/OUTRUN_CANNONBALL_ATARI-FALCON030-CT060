@@ -216,6 +216,12 @@ public:
 	void init();
     void boot();
 	void tick(bool tick_frame);
+    // The 30 fps step in two halves (Atari port, VBL-paced display): part 0 = main CPU logic,
+    // road CPU and the first vertical interrupt; part 1 = the second vertical interrupt and the
+    // end of the step. tick_part(f, 0) then tick_part(f, 1) does exactly what tick(f) does with
+    // config.fps == 30, but a picture can be drawn between the two, as the arcade shows one per
+    // vertical interrupt (60 Hz) while its logic runs at 30 Hz.
+    void tick_part(bool tick_frame, int part);
 	void vint();
     void init_best_outrunners();
     void select_course(const bool jap, const bool prototype);
