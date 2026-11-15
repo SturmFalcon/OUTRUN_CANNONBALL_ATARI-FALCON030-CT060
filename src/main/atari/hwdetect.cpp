@@ -85,7 +85,7 @@ void hw_detect()
     for (int i = 0; i < 2; i++)
     {
         Supexec(measure_super);
-        if ((uint64_t)m_iters * best_ticks > (uint64_t)best_iters * m_ticks)
+        if (m_iters * best_ticks > best_iters * m_ticks)   // < 2^32: about 1e6 iterations x 33 ticks
         {
             best_iters = m_iters;
             best_ticks = m_ticks;
@@ -94,8 +94,11 @@ void hw_detect()
     h.spin_iters = best_iters;
     h.spin_ticks = best_ticks;
     h.cycles_per_iter = cycles_for(h.cpu);
-    // cycles per second = iters * cycles_per_iter * 200 / ticks; MHz x 10 = that / 100000.
-    h.mhz_x10 = best_ticks ? (uint32_t)(((uint64_t)best_iters * h.cycles_per_iter * 200) / ((uint64_t)best_ticks * 100000)) : 0;
+    // cycles per second = iters * cycles_per_iter * 200 / ticks; MHz x 10 = that / 100000
+    // = iters * cycles_per_iter / (ticks * 500). 32-bit only (no 64-bit libgcc helpers, which
+    // are 68020+ code in some toolchains and trap on a 68060): iters * 40 stays below 2^32 up to
+    // 100 million iterations.
+    h.mhz_x10 = best_ticks ? (best_iters * h.cycles_per_iter) / (best_ticks * 500) : 0;
     h.profile = profile_for(h.cpu, h.mhz_x10);
 }
 
