@@ -30,6 +30,8 @@
 #include <mint/osbind.h>
 #include <mint/basepage.h>
 #include <mint/cookie.h>
+#include "atari/hwdetect.hpp"
+#include "atari/cadlog.hpp"
 
 // Stack size requested from the MiNTLib startup code (__stksize).
 extern "C" long __stksize = 262144L;
@@ -94,6 +96,7 @@ static long g_user_ssp = 0;
 // the two different ways this program can end.
 static void quit_cleanup()
 {
+    cadlog_remove();        // the cadence log's VBL routine, if a bench build installed it
     audio.stop_audio();
     dsp_replay.stop();      // hands Timer A, the sound matrix and the DSP back (no-op unless mod_dsp started it)
     dspmod.shutdown();      // same for DSPMOD (mod_dsp = 2)
@@ -533,7 +536,7 @@ static void main_loop()
             static int b_frame = 0, cnt = 0;
             static double sum = 0, sumsq = 0, ssum = 0, ssumsq = 0; static int maxms = 0;
             static int last_f = 0;
-            if (renders == BENCH_START) { b_hz = *hz200; b_frame = cannonball::frame; last_p = p1; }
+            if (renders == BENCH_START) { b_hz = *hz200; b_frame = cannonball::frame; last_p = p1; if (cadlog_install()) cadlog_reset(); }
             else if (renders > BENCH_START && renders <= BENCH_START + BENCH_N)
             {
                 double d = (double)(p1 - last_p) * 1000.0 / 600.0;      // ms between two pictures
@@ -552,6 +555,27 @@ static void main_loop()
                 double smean = ssum / cnt, svar = ssumsq / cnt - smean * smean;
                 printf("BENCH pictures=%d hz200=%lu logic=%d K=%d interval_ms=%d max_ms=%d std_ms=%d steps_per_pic_x100=%d std_x100=%d audio=%d%c%c", BENCH_N, (unsigned long)dt,
                        cannonball::frame - b_frame, K, (int)mean, maxms, (int)(var > 0 ? __builtin_sqrt(var) : 0), (int)(smean * 100), (int)(100 * (svar > 0 ? __builtin_sqrt(svar) : 0)), (int)audio_on, 13, 10);
+                {
+                    CadLog c; cadlog_get(&c);
+                    printf("CADENCE vbls=%lu shown=%lu drawn=%d hold1=%lu hold2=%lu hold3=%lu hold4=%lu hold5=%lu hold6=%lu hold7=%lu hold8+=%lu%c%c",
+                           (unsigned long)c.vbls, (unsigned long)c.shown, BENCH_N, (unsigned long)c.hold[1], (unsigned long)c.hold[2], (unsigned long)c.hold[3],
+                           (unsigned long)c.hold[4], (unsigned long)c.hold[5], (unsigned long)c.hold[6], (unsigned long)c.hold[7], (unsigned long)c.hold[8], 13, 10);
+                    char hw[256]; hw_describe(hw); printf("%s%c%c", hw, 13, 10);
+                    // The same three lines in JOURNAUX\CBBENCH.LOG (test bench convention: relative path,
+                    // one file, appended), so the result survives without a console.
+                    Dcreate("JOURNAUX");
+                    FILE* bl = fopen("JOURNAUX\\CBBENCH.LOG", "a");
+                    if (bl)
+                    {
+                        fprintf(bl, "BENCH pictures=%d hz200=%lu logic=%d K=%d interval_ms=%d max_ms=%d std_ms=%d steps_per_pic_x100=%d std_x100=%d audio=%d\r\n", BENCH_N, (unsigned long)dt,
+                                cannonball::frame - b_frame, K, (int)mean, maxms, (int)(var > 0 ? __builtin_sqrt(var) : 0), (int)(smean * 100), (int)(100 * (svar > 0 ? __builtin_sqrt(svar) : 0)), (int)audio_on);
+                        fprintf(bl, "CADENCE vbls=%lu shown=%lu drawn=%d hold1=%lu hold2=%lu hold3=%lu hold4=%lu hold5=%lu hold6=%lu hold7=%lu hold8+=%lu\r\n",
+                                (unsigned long)c.vbls, (unsigned long)c.shown, BENCH_N, (unsigned long)c.hold[1], (unsigned long)c.hold[2], (unsigned long)c.hold[3],
+                                (unsigned long)c.hold[4], (unsigned long)c.hold[5], (unsigned long)c.hold[6], (unsigned long)c.hold[7], (unsigned long)c.hold[8]);
+                        fprintf(bl, "%s\r\n", hw);
+                        fclose(bl);
+                    }
+                }
                 // Exit cleanly right after printing: stdout to a redirected file is fully buffered
                 // (not line-buffered) while the guest process is alive, so without an explicit exit
                 // here the BENCH line just sits in the C library's buffer and is never seen - only
@@ -675,6 +699,7 @@ int main(int argc, char* argv[])
 #ifdef STARTUP_DEBUG
     printf("DEBUG C: after config.load()%c%c", 13, 10);
 #endif
+    hw_detect();                        // CPU, CT60, RAM, measured clock (atari/hwdetect.hpp)
     atari_load_options("outrun.ini");   // optional: shadows, scenery, cadence, sound (see atari/options.hpp)
     if (atari_opt.mod)
     {
