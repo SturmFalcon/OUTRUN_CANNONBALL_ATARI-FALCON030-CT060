@@ -490,14 +490,21 @@ void Render::draw_frame(uint16_t* pixels)
         // Captures exactly what draw_frame() just put together, including the PAUSE overlay
         // above if paused - a one-off, CPU-heavy call (no lookup tables, see screenshot.cpp) that
         // is fine to let stall this one picture since it only ever runs on a manual keypress.
+#ifndef SHOTHALVES
         atari_save_screenshot(dst, S16_WIDTH, S16_HEIGHT, fal_stride);
+#endif
 #ifdef DUMP_INDEX
         {
             // Test aid: the picture's palette indices and the palette (RGB565, 0x2000 entries,
             // shadowed half last) next to the screenshot, in IXnnnn.BIN.
             static int n = 0;
             char name[16];
+#ifdef SHOTHALVES
+            extern uint32_t g_shot_tag;
+            std::sprintf(name, "IX%05lu.BIN", (unsigned long)g_shot_tag); ++n;
+#else
             std::sprintf(name, "IX%04d.BIN", ++n);
+#endif
             FILE* fp = fopen(name, "wb");
             if (fp) { fwrite(pixels, 2, S16_WIDTH * S16_HEIGHT, fp); fwrite(rgb565, 2, 2 * S16_PALETTE_ENTRIES, fp); fclose(fp); }
         }

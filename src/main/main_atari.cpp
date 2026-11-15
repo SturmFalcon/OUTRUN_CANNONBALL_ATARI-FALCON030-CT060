@@ -718,6 +718,10 @@ static uint32_t fine_now()
 int g_vrate_level = 2;                      // VBLs per picture now in use (for the menu / logs)
 uint32_t g_vsync_missed = 0;                // pictures skipped because the game was a group behind
 
+#ifdef SHOTHALVES
+static uint32_t g_halves = 0;
+uint32_t g_shot_tag = 0;
+#endif
 static void main_loop_vsync()
 {
     static const int N_MAX = 6;             // 10 pictures/s at 60 Hz
@@ -782,6 +786,9 @@ static void main_loop_vsync()
             else
                 tick_half2();
             phase ^= 1;
+#ifdef SHOTHALVES
+            g_halves++;
+#endif
         }
         const uint32_t g1 = fine_now();
         const uint32_t lh = (g1 - g0) / n;
@@ -809,6 +816,13 @@ static void main_loop_vsync()
         else
         {
             g_present_vbl = S + atari_opt.vsync_lat;
+#ifdef SHOTHALVES
+            // Test aid (-DSHOTHALVES, with -DAUTOPLAY -DDUMP_INDEX): the engine's picture after a
+            // given number of half steps, IXhhhhh.BIN, whatever the picture rate: two builds can then
+            // be compared picture for picture (renderer changes must give identical indices).
+            if (g_halves % 50 == 0 && g_halves >= 400 && g_halves <= 2400) { g_shot_tag = g_halves; g_take_screenshot = true; }
+            if (g_halves > 2400) state = STATE_QUIT;
+#endif
             video.prepare_frame();
             video.render_frame();
             // queued at or after its VBL: shown one VBL late (or more)
