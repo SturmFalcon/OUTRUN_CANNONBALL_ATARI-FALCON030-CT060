@@ -536,7 +536,11 @@ static void main_loop()
             static int b_frame = 0, cnt = 0;
             static double sum = 0, sumsq = 0, ssum = 0, ssumsq = 0; static int maxms = 0;
             static int last_f = 0;
-            if (renders == BENCH_START) { b_hz = *hz200; b_frame = cannonball::frame; last_p = p1; if (cadlog_install()) cadlog_reset(); }
+            if (renders == BENCH_START) { b_hz = *hz200; b_frame = cannonball::frame; last_p = p1; if (cadlog_install()) cadlog_reset();
+#ifdef STWRITE_COUNT
+                { extern uint32_t g_st_longs, g_st_rows; g_st_longs = g_st_rows = 0; }
+#endif
+            }
             else if (renders > BENCH_START && renders <= BENCH_START + BENCH_N)
             {
                 double d = (double)(p1 - last_p) * 1000.0 / 600.0;      // ms between two pictures
@@ -561,6 +565,10 @@ static void main_loop()
                            (unsigned long)c.vbls, (unsigned long)c.shown, BENCH_N, (unsigned long)c.hold[1], (unsigned long)c.hold[2], (unsigned long)c.hold[3],
                            (unsigned long)c.hold[4], (unsigned long)c.hold[5], (unsigned long)c.hold[6], (unsigned long)c.hold[7], (unsigned long)c.hold[8], 13, 10);
                     char hw[256]; hw_describe(hw); printf("%s%c%c", hw, 13, 10);
+#ifdef STWRITE_COUNT
+                    extern uint32_t g_st_longs, g_st_rows;
+                    printf("STWRITE bytes_per_pic=%lu rows_per_pic=%lu%c%c", (unsigned long)(g_st_longs * 4 / BENCH_N), (unsigned long)(g_st_rows / BENCH_N), 13, 10);
+#endif
                     // The same three lines in JOURNAUX\CBBENCH.LOG (test bench convention: relative path,
                     // one file, appended), so the result survives without a console.
                     Dcreate("JOURNAUX");

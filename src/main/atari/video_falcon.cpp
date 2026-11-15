@@ -59,6 +59,9 @@ extern "C" void atari_truecolor_diff(const uint16_t* px, uint16_t* shadow, const
 // from that copy: a car moving across a row no longer means rewriting the whole row. 0xFFFF
 // never is an index, so a copy filled with it makes every pixel be written.
 static uint16_t* shadow[3] = { 0, 0, 0 };
+#ifdef STWRITE_COUNT
+uint32_t g_st_longs = 0, g_st_rows = 0;   // test aid, see convert_rows_diff()
+#endif
 
 static void shadow_invalidate(int i)
 {
@@ -70,6 +73,20 @@ static void convert_rows_diff(const uint16_t* src, const uint16_t* pal, uint16_t
 {
 #ifdef MOVE16
     if (use_move16) sh = 0;
+#endif
+#ifdef STWRITE_COUNT
+    // Test aid: count what reaches the screen (ST-RAM), in long words, before it is written.
+    {
+        extern uint32_t g_st_longs, g_st_rows;
+        g_st_rows += rows;
+        if (!sh) g_st_longs += (uint32_t)rows * (S16_WIDTH / 2);
+        else
+        {
+            const uint32_t* a = (const uint32_t*)src;
+            const uint32_t* b = (const uint32_t*)sh;
+            for (int k = 0; k < rows * (S16_WIDTH / 2); k++) if (a[k] != b[k]) g_st_longs++;
+        }
+    }
 #endif
     if (!sh) { convert_rows(src, pal, dst, rows, dst_stride); return; }
     for (int q = 0; q < rows; q++)
