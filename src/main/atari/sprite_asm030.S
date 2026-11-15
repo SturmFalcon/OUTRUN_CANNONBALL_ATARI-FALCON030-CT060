@@ -581,11 +581,36 @@ span_row:
 	moveq	#0,%d4
 	tst.l	_atari_sr+R_FLIP
 	bne.s	span_back
-span_fwd:
-	move.l	%d1,%d0
-	swap	%d0
-	move.b	(%a1,%d0.w),%d4
+| Unflipped: the source position is kept "swapped" (integer part in the low word, fraction in
+| the high word), so that one add.l + addx.w advances it and the low word indexes the nibble
+| bytes directly (no move/swap per pixel). d6 = 0 for the addx. Drawing rightwards (pstep +2,
+| the usual case) uses (a2)+.
+	swap	%d1
+	swap	%d2
+	moveq	#0,%d6
+	cmpa.w	#2,%a6
+	bne.s	span_fwd
+span_fr:
+	move.b	(%a1,%d1.w),%d4
 	move.w	(%a3,%d4.w*2),%d0		| colour|pix, 0 transparent / marker, 0x8000 shadow
+	beq.s	2f
+	bpl.s	1f
+	move.w	(%a2),%d0
+	and.w	#0x0fff,%d0
+	add.w	#0x1000,%d0
+1:	move.w	%d0,(%a2)+
+	add.l	%d2,%d1
+	addx.w	%d6,%d1
+	dbra	%d7,span_fr
+	bra.s	span_none
+2:	addq.l	#2,%a2
+	add.l	%d2,%d1
+	addx.w	%d6,%d1
+	dbra	%d7,span_fr
+	bra.s	span_none
+span_fwd:
+	move.b	(%a1,%d1.w),%d4
+	move.w	(%a3,%d4.w*2),%d0
 	beq.s	2f
 	bpl.s	1f
 	move.w	(%a2),%d0
@@ -594,6 +619,7 @@ span_fwd:
 1:	move.w	%d0,(%a2)
 2:	adda.l	%a6,%a2
 	add.l	%d2,%d1
+	addx.w	%d6,%d1
 	dbra	%d7,span_fwd
 	bra.s	span_none
 span_back:
