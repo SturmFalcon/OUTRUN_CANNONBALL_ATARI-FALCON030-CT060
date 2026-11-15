@@ -11,15 +11,19 @@ différente) ne sont **pas** repris tels quels.
 | copie Fast → Fast | 0,15 |
 | c2p vers ST | 0,85 à 0,91 |
 
-## Estimation Cannonball sur CT60 60 MHz [HYPOTHÈSE]
-Rendu [H] 68 ms = environ 65 ms de calcul + environ 3,4 ms d'écriture ST (72 Ko).
-- calcul : 65 / 3,0 à 65 / 1,5 → 22 à 43 ms (médiane 30 ms)
-- écriture ST : 72 Ko à 5,6 Mo/s → 13 ms
-- soit **35 à 56 ms par image (médiane ≈ 43 ms)**, plus environ 0,5 ms par moitié de pas.
+## Estimation Cannonball sur CT60 [HYPOTHÈSE]
+Rendu [H] ≈ 46 ms = ≈ 43 ms de calcul + ≈ 3,4 ms d'écriture ST (72 Ko). Le calcul suit les MHz, pas l'écriture ST
+(bus du Falcon).
 
-Donc, sur la version actuelle : 30 i/s (33 ms) **hors de portée** ; AUTO choisirait probablement 20 i/s
-(50 ms), voire 15. La correction par rapport à l'estimation précédente (20 à 30 ms) vient d'un profil v0.39 pris
-par erreur en RVB 50 Hz, où 27 % du temps était de l'attente : en VGA le rendu coûte bien ≈ 65-68 ms [H].
+| CT60 | calcul | écriture ST | total par image | AUTO choisirait |
+|---|---|---|---|---|
+| 60 MHz | ≈ 19 ms (14-28) | ≈ 13 ms | ≈ 32 ms (27-41) | 30 i/s à la limite, sinon 20 |
+| 75 MHz | ≈ 15 ms | ≈ 13 ms | ≈ 28 ms | 30 i/s |
+| 90 MHz | ≈ 13 ms | ≈ 13 ms | ≈ 26 ms | 30 i/s |
 
-À vérifier par la tâche CB-CAL-RCT60-01 (v0.39 instrumentée, en file pour le prochain montage CT60).
-Prochain levier : le rendu (sprites, conversion, écriture ST), pas la logique.
+60 i/s (16,7 ms tout compris) est hors de portée en pleine qualité, même à 90 MHz. L'affichage ne dépasse
+jamais 60 Hz (règle STurm).
+
+Historique : une première estimation (20-30 ms) venait d'un profil pris en RVB 50 Hz, une deuxième (35-56 ms)
+d'une version de mesure ralentie par le compteur STWRITE ; celle-ci est faite sans l'un ni l'autre.
+À vérifier par la tâche CB-CAL-RCT60-01 (en file pour le prochain montage CT60).

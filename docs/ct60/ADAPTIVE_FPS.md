@@ -45,12 +45,7 @@ Option de test `-DSTATE_CRC` : somme de contrôle de l'état (road_pos, car_incr
 game_state) après chaque pas, écrite aux pas 300/600/900/1200. [H] 15/11 : **identique** pour v0.39,
 l'ancienne boucle, AUTO, 60, 20 et 15 fixes (`mesures/2026-11-15_adaptatif_H060/statecrc.txt`).
 
-## Écrans 75 / 90 Hz : étude (rien d'annoncé, rien de validé)
-- La logique du jeu est à 30 Hz (vint 60 Hz). À 75 Hz, 30 pas/s = 2,5 VBL par pas : aucune cadence régulière
-  ne suit la logique (75/37,5/25 i/s montrent des pas inégaux). **Pire que 60 Hz.**
-- À 90 Hz, 30 pas/s = 3 VBL : 30 i/s régulières (comme à 60 Hz), 45 i/s = 1,5 VBL par moitié de pas : saccade.
-  **Aucun gain** sur 60 Hz pour ce jeu.
-- Côté Videl : en VGA l'horloge pixel est 25,175 MHz (ou 32 MHz) ; à fréquence ligne VGA (31,5 kHz), 75 Hz ne laisse
-  que ~419 lignes totales, trop peu pour 224 lignes doublées (448). Il faudrait une fréquence ligne hors norme VGA,
-  donc un moniteur multisync et des registres Videl non documentés dans falcon-dev-docs. Hatari ne valide pas ces modes.
-- Conclusion : 75/90 Hz non retenus. Ils ne seraient étudiés que sur un vrai Falcon avec un moniteur qui les accepte.
+## Affichage : jamais au-dessus de 60 Hz
+Règle de STurm (15/11/2026) : l'affichage ne dépasse jamais 60 Hz (VGA 60 Hz ; RVB 50 Hz reste compatible).
+Les « 75 / 90 » de la mission désignent une CT60 réglée à 75 ou 90 MHz : AUTO s'y adapte seul, puisqu'il
+mesure le coût réel de chaque image au lieu de lire une table de fréquences. Voir PERFORMANCE_PROFILES.md.

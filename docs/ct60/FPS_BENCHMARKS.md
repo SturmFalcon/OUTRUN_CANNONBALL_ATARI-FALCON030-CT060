@@ -7,30 +7,35 @@ Données brutes : `/mnt/project-files/cannonball-ct60/mesures/` (dossiers datés
 
 ## Cadence et régularité (réglages par défaut : pleine qualité)
 
-| Version | Boucle | i/s | images à durée irrégulière* | pas logiques/s | coût/image moyen / p95 / max |
+| Version | Boucle | i/s | images à durée exacte | pas logiques/s | coût/image moyen / p95 / max |
 |---|---|---|---|---|---|
-| v0.39 (4168938a) | 200 Hz, K=2 | 14,8 | 59-89 / 400 | 29,8 | non mesuré (≈ 67 ms d'intervalle) |
-| VBL `vsync_lat=1` (4fa33f8) | VBL, K=2 | 14,7 | 52 / 400 | 29,8 | — |
-| VBL `vsync_lat=2` | VBL, K=2 | 14,7 | 16 / 400 | 29,8 | — |
-| Adaptatif AUTO (fc2dad7) | VBL, n auto | 9,9 | **5 / 400** (395 × 6 VBL) | 29,8 | 74,9 / 98 / 110 ms |
-| Adaptatif AUTO, lat 2 | VBL, n auto | 9,9 | **1 / 400** | 29,8 | 75,6 / 98 / 110 ms |
-| Adaptatif 15 fixe | VBL, n=4 | 14,0 | 141 / 400 | 29,8 | 67,2 / 90 / 103 ms |
-| Adaptatif 30 fixe (réglages légers) | VBL, n=2 | 18,8 | 321 / 400 | 29,9 | 50,8 / 63+ / 92 ms |
-| Adaptatif 60 fixe | VBL, n=1 | 15,5 | 399 / 400 | 29,8 | 60,5 / 84 / 101 ms |
+| v0.39 (4168938a) | 200 Hz, K=2 | 14,8 | 342 / 401 | 29,8 | non mesuré (≈ 67 ms d'intervalle) |
+| VBL `vsync_lat=1` (4fa33f8) | VBL, K=2 | 14,7 | 348 / 400 | 29,8 | — |
+| VBL `vsync_lat=2` | VBL, K=2 | 14,7 | 384 / 400 | 29,8 | — |
+| Adaptatif 15 fixe (653ed94) | VBL, n=4 | 14,8 | **399 / 400** | 30,0 | 50,1 / 64 / 74 ms |
+| Adaptatif 60 fixe | VBL, n=1 | 21,0 | 1 / 400 (ne tient pas) | 29,8 | 45,1 / 54 / 70 ms |
+| AUTO, 1re règle de montée (653ed94) | VBL, n auto | 11,8 | 392 / 400 à 12 i/s | 29,8 | 54,4 / 69 / 79 ms |
+| **AUTO réglé (montée : moyenne +10 %, crête dans n−1+lat VBL)** | VBL, n auto | **14,4** | 357 × 15 i/s, 36 × 12, 7 × 10, **0 retard** | 29,7 | 50,4 / 63 / 73 ms |
+| AUTO réglé, sans ombres | VBL, n auto | 14,4 | 358 × 15 i/s, 0 retard | 29,7 | 47,6 / 60 / 68 ms |
+| AUTO réglé, réglages légers | VBL, n auto | 18,5 | 336 × 20 i/s, 45 × 15, 19 × 12 | 29,7 | 34,8 / 42 / 50 ms |
 
-\* images restées à l'écran un nombre de VBL différent de la valeur visée (journal CADENCE).
+« images à durée exacte » : images restées à l'écran exactement le nombre de VBL de leur niveau (journal CADENCE) ;
+les autres sont les changements de niveau du début (AUTO part à 20 i/s sous Hatari puis descend).
 
-Lecture : sous Hatari 32 MHz aucune cadence ≥ 15 i/s ne tient régulièrement ; AUTO choisit donc 10 i/s,
-parfaitement régulières (choix « stabilité avant nombre »). Forcer 15/30/60 donne plus d'images mais irrégulières ;
-la vitesse du jeu reste exacte dans tous les cas (29,8-29,9 pas/s, mêmes sommes d'état que v0.39).
+Lecture : sous Hatari 32 MHz, AUTO tient 15 i/s pleine qualité sans aucune image en retard, et 20 i/s en réglages
+légers. Forcer 60 donne plus d'images mais irrégulières ; la vitesse du jeu reste exacte dans tous les cas
+(29,7-30 pas/s, mêmes sommes d'état que v0.39).
 
-## Répartition du coût d'une image [H] (B060Z, AUTO pleine qualité)
-- rendu de l'image (sprites, tuiles, route, conversion RGB565, écriture ST) : **68,0 ms**
-- une moitié de pas de jeu (logique + route CPU + vint + son) : **1,1 ms**
-- écriture ST-RAM : 71,8 Ko par image, dont 95 % de mots réellement changés.
+**Attention** : les versions de mesure compilées avec `-DSTWRITE_COUNT` (compteur d'octets écrits) sont ≈ 40 %
+plus lentes au rendu ; aucun chiffre de cadence ne doit venir d'elles (B060W2, B060X/Y/Z écartés).
 
-Conséquence : la cadence dépend presque entièrement du rendu ; la logique du jeu est négligeable.
-Profil par fonction (v0.39) : sprites ≈ 31 % du travail, conversion+écriture ≈ 16 %, tuiles ≈ 11 %, route ≈ 10 %.
+## Répartition du coût d'une image [H] (B060P, AUTO pleine qualité)
+- rendu de l'image (sprites, tuiles, route, conversion RGB565, écriture ST) : **≈ 46 ms**
+- une moitié de pas de jeu (logique + route CPU + vint + son) : **≈ 1,1 ms**
+- écriture ST-RAM : ≈ 72 Ko par image, dont 95 % de mots réellement changés.
+
+La cadence dépend presque entièrement du rendu. Profil par fonction (hors compteur) : sprites zoomés ≈ 33 %,
+conversion couleur + écriture ≈ 16 %, tuiles ≈ 10 %, route ≈ 9 %.
 
 ## Par scène
 Seule la scène « course, 1re étape, ligne droite puis virages » est couverte par l'autoplay. Menus, attract mode,

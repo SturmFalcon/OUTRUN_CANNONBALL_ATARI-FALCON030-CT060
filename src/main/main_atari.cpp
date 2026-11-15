@@ -699,8 +699,9 @@ static void main_loop()
 // n is chosen from what the pictures and the halves really cost (Timer C fine clock, 26 us):
 // one level down when the cost of a group of n halves plus its picture no longer fits n VBLs
 // (6 pictures in a row) or two pictures missed their VBL out of the last 16; one level up only
-// after about 3 s in which the slowest recent picture would have fitted the faster level with
-// 20 % to spare. outrun.ini vrate fixes n instead (60, 30, 20, 15).
+// after about 3 s in which the average cost would fit the faster level with 10 % to spare and
+// the recent peak would still be shown on time (n - 1 + vsync_lat VBLs). outrun.ini vrate fixes
+// n instead (60, 30, 20, 15).
 // ------------------------------------------------------------------------------------------
 
 // 26.04 us units (Timer C runs from 192 down to 1 between two 200 Hz ticks). Supervisor only.
@@ -727,7 +728,7 @@ static void main_loop_vsync()
     int n_min = 1;
     uint32_t S = g_vbl;                     // VBL slot of the next group's first half
     uint32_t R = 0, Lh = 0, R_peak = 0, Lh_peak = 0;   // fine units: picture, one half (smoothed / peak)
-    int down_votes = 0, up_count = 0;
+    int down_votes = 0, up_count = 0, grace = 0;
     uint32_t miss_hist = 0;                 // last 32 pictures, bit = 1 if it missed its VBL
     uint32_t idle = 0;
     bool audio_on = false;
@@ -872,7 +873,11 @@ static void main_loop_vsync()
         }
 
         if (fixed) continue;
-        // Level choice. cost(k) = picture + k halves, against k VBLs.
+        // Level choice. cost(k) = picture + k halves. Sustained, it must fit k VBLs (otherwise the
+        // game falls behind); a single picture may take up to k + vsync_lat VBLs (it is then
+        // still shown on time). After a change, the backlog of the old level is not held against
+        // the new one for 8 pictures (grace).
+        if (grace > 0) { grace--; miss_hist = 0; }
         const int missed16 = __builtin_popcount(miss_hist & 0xFFFF);
         if (R + (uint32_t)n * Lh > (uint32_t)n * vbl_fine || missed16 >= 2)
         {
@@ -881,13 +886,17 @@ static void main_loop_vsync()
                 if (n < N_MAX) n++;
                 down_votes = up_count = 0;
                 miss_hist = 0;
+                grace = 8;
             }
         }
         else down_votes = 0;
-        if (n > n_min && (R_peak + (uint32_t)(n - 1) * Lh_peak) * 100 <= 80u * (uint32_t)(n - 1) * vbl_fine)
+        const uint32_t k = (uint32_t)(n - 1);
+        if (n > n_min
+            && (R + k * Lh) * 100 <= 90u * k * vbl_fine                                   // average: 10 % to spare
+            && R_peak + k * Lh_peak <= (k + (uint32_t)atari_opt.vsync_lat) * vbl_fine)    // peaks still on time
         {
             up_count += n;                  // VBLs spent with room for the faster level
-            if (up_count >= 180) { n--; up_count = down_votes = 0; }
+            if (up_count >= 180) { n--; up_count = down_votes = 0; miss_hist = 0; grace = 8; }
         }
         else up_count = 0;
         g_vrate_level = n;
