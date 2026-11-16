@@ -516,6 +516,23 @@ ffsn:
 | draws. Only the pixels inside the clip window are visited.
 | In: a2 first destination pixel, a4/a5 clip start/end, a6 pstep, d3 hzoom, a3 ttab.
 | d5/d6 (colour, shadow) are free here: the whole sprite takes this path.
+| reg = reg / d3 (hzoom, at most 0xffe), unsigned: the per-row setup of span_row.
+| [EXPÉRIMENTAL] -DSPR_DIVW: 16-bit divide (half the cycles of divu.l in the 68060 manual's table)
+| whenever the quotient fits in 16 bits, divu.l otherwise. Same results. Measured 4 % SLOWER
+| under Hatari (38.1 vs 36.5 ms): kept off by default, for the real CT60 campaign only.
+	.macro	DIVU_HZ	reg
+#ifdef SPR_DIVW
+	divu.w	%d3,\reg
+	bvs.s	.Ldl\@
+	and.l	#0xffff,\reg			| drop the remainder
+	bra.s	.Ldd\@
+.Ldl\@:
+	divu.l	%d3,\reg
+.Ldd\@:
+#else
+	divu.l	%d3,\reg
+#endif
+	.endm
 span_row:
 	move.l	_atari_sr+R_ADDR,%d0		| first source word
 	move.l	_atari_sr+R_ENDTAB,%a1
@@ -535,7 +552,7 @@ span_row:
 	lsl.l	%d4,%d2
 	add.l	%d3,%d2
 	subq.l	#1,%d2
-	divu.l	%d3,%d2
+	DIVU_HZ	%d2
 	move.l	%a2,%d4				| p
 	move.l	%a6,%d0
 	bmi.s	2f
@@ -577,7 +594,7 @@ span_row:
 	add.l	%d4,%d4				| lead * 0x200
 	add.l	%d3,%d4
 	subq.l	#1,%d4
-	divu.l	%d3,%d4
+	DIVU_HZ	%d4
 	cmp.l	%d4,%d5
 	bge.s	8f
 	move.l	%d4,%d5
@@ -589,7 +606,7 @@ span_row:
 	add.l	%d4,%d4				| (last + 1) * 0x200
 	add.l	%d3,%d4
 	subq.l	#1,%d4
-	divu.l	%d3,%d4
+	DIVU_HZ	%d4
 	cmp.l	%d4,%d6
 	ble.s	9f
 	move.l	%d4,%d6
