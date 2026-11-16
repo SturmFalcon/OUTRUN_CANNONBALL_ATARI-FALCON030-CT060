@@ -24,6 +24,10 @@
 extern "C" void atari_truecolor(const uint16_t* px, const uint16_t* pal, uint16_t* dst, uint32_t blocks4);
 #include "atari/options.hpp"
 extern "C" uint32_t atari_rowcmp(const uint32_t* a, const uint32_t* b, uint32_t longs);
+#ifdef MOVE16_DIFF
+#define MOVE16
+extern "C" void atari_truecolor_diff16(const uint16_t* px, uint16_t* shadow, const uint16_t* pal, uint16_t* dst, uint32_t blocks, uint16_t* buf16);
+#endif
 #ifdef MOVE16
 extern "C" void atari_copy16(void* dst, const void* src, uint32_t lines);
 static bool use_move16 = false;                                   // set in init(): 68060 and aligned screen rows
@@ -88,7 +92,15 @@ static void shadow_invalidate(int i)
 // convert_rows(), writing only what differs from sh (the shadow copy of these destination rows).
 static void convert_rows_diff(const uint16_t* src, const uint16_t* pal, uint16_t* dst, uint16_t* sh, int rows, int dst_stride)
 {
-#ifdef MOVE16
+#ifdef MOVE16_DIFF
+    // [EXPÉRIMENTAL] -DMOVE16_DIFF: changed 16-byte blocks only, each pushed with one MOVE16 burst.
+    if (use_move16 && sh && !g_stpump_on)
+    {
+        for (int q = 0; q < rows; q++)
+            atari_truecolor_diff16(src + q * S16_WIDTH, sh + q * S16_WIDTH, pal, dst + q * dst_stride, S16_WIDTH / 8, linebuf);
+        return;
+    }
+#elif defined(MOVE16)
     if (use_move16) sh = 0;
 #endif
 #ifdef STWRITE_COUNT

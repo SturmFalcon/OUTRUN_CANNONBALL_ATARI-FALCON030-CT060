@@ -146,6 +146,61 @@ rc_same:
 	moveq	#0,%d0
 	rts
 
+#if defined(MOVE16_DIFF) && (defined(__mc68040__) || defined(__mc68060__))
+| void atari_truecolor_diff16(const uint16_t* px, uint16_t* shadow, const uint16_t* pal,
+|                             uint16_t* dst, uint32_t blocks, uint16_t* buf16)
+| [EXPÉRIMENTAL, -DMOVE16_DIFF] Hybrid of atari_truecolor_diff and MOVE16: the row is taken
+| 8 pixels (16 bytes, 4 index longs) at a time; a block whose 4 longs all match the shadow is
+| skipped, otherwise the shadow is updated, the 8 pixels are converted into buf16 (fast RAM,
+| 16-byte aligned) and pushed to dst with one MOVE16 burst. dst must be 16-byte aligned.
+| Writes more bytes than the pair diff (whole 16-byte blocks) but only as bursts: which wins on
+| the Falcon's ST bus is for the real CT60 to tell. blocks must be 1..65536.
+	.text
+	.even
+	.globl	_atari_truecolor_diff16
+_atari_truecolor_diff16:
+	movem.l	%d2-%d5/%a2-%a4,-(%sp)		| 7 regs = 28 bytes
+	move.l	32(%sp),%a0			| px
+	move.l	36(%sp),%a3			| shadow
+	move.l	40(%sp),%a1			| pal
+	move.l	44(%sp),%a2			| dst
+	move.l	48(%sp),%d1
+	move.l	52(%sp),%a4			| buf16
+	subq.l	#1,%d1
+t16_loop:
+	movem.l	(%a0)+,%d2-%d5			| 8 indices
+	cmp.l	(%a3),%d2
+	bne.s	t16_conv
+	cmp.l	4(%a3),%d3
+	bne.s	t16_conv
+	cmp.l	8(%a3),%d4
+	bne.s	t16_conv
+	cmp.l	12(%a3),%d5
+	bne.s	t16_conv
+	lea	16(%a3),%a3
+	lea	16(%a2),%a2
+	dbra	%d1,t16_loop
+	bra.s	t16_done
+t16_conv:
+	movem.l	%d2-%d5,(%a3)
+	lea	16(%a3),%a3
+	.irp	r,%d2,%d3,%d4,%d5
+	move.w	\r,%d0
+	swap	\r
+	move.w	(%a1,\r\().w*2),\r
+	swap	\r
+	move.w	(%a1,%d0.w*2),\r
+	move.l	\r,(%a4)+
+	.endr
+	lea	-16(%a4),%a4
+	move16	(%a4)+,(%a2)+
+	lea	-16(%a4),%a4
+	dbra	%d1,t16_loop
+t16_done:
+	movem.l	(%sp)+,%d2-%d5/%a2-%a4
+	rts
+#endif
+
 #if defined(__mc68040__) || defined(__mc68060__)
 | void atari_copy16(void* dst, const void* src, uint32_t lines)
 | Copies `lines` 16-byte lines with MOVE16 (one burst each); dst and src must be 16-byte aligned.
