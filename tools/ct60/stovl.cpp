@@ -8,6 +8,11 @@
 //   B  work alone
 //   C  work with one ST long written after each block          (ideal spread)
 //   D  work with the real pump (atari_st_pump, K longs every K blocks), K = 1, 2, 4, 8
+//   E  the same 72 KB copied Fast -> ST with MOVE16 bursts (16 bytes each), alone
+//   F  work with one MOVE16 burst (4 longs) after every 4 blocks          (hybrid: bursts spread)
+//   G  the game's real conversion (atari_truecolor_diff, 224 rows, half the pairs changed so
+//      that ~72 KB are written) into ST-RAM, and H the same into fast RAM: G - H is the ST
+//      share of the real conversion loop on this machine.
 // overlap % = (A + B - X) / min(A, B): 100 = the ST time is completely hidden, 0 = none.
 // Results to JOURNAUX\STOVL.LOG; argument AUTO = no key at the end. 68060 code: refuses to run
 // below a 68040 (_CPU cookie).  Build: tools/ct60/build_stovl.sh
@@ -17,6 +22,17 @@
 #include <mint/osbind.h>
 #include <mint/cookie.h>
 #include "atari/stpump.hpp"
+
+extern "C" void atari_copy16(void* dst, const void* src, uint32_t lines);
+extern "C" void atari_truecolor_diff(const uint16_t* px, uint16_t* shadow, const uint16_t* pal, uint16_t* dst, uint32_t longs);
+static uint32_t* st_al;                      // st_buf, 16-byte aligned (MOVE16)
+static uint32_t* fast_img;                   // 72 KB source for MOVE16, 16-byte aligned
+static uint16_t* idx;                        // 320x224 colour indices
+static uint16_t* shadow_ref;                 // what the "screen" shows: half the pairs differ
+static uint16_t* shadow;                     // working copy, reset before each run
+static uint16_t* pal;                        // 8192 RGB565 entries
+static uint16_t* st_screen;                  // 320x224x2 in ST-RAM
+static uint16_t* fast_screen;                // same in fast RAM
 
 static const int NL = 18000;                 // longs per "picture"
 static volatile uint32_t* st_buf;            // ST-RAM, 72 KB
@@ -64,6 +80,23 @@ static long run_super()
         t0 = fine_now();
         for (int i = 0; i < NL; i++) { work_block(i); st_buf[i] = (uint32_t)i; }
         t1 = fine_now(); break;
+    case 4:   // E
+        t0 = fine_now();
+        atari_copy16(st_al, fast_img, NL * 4 / 16);
+        t1 = fine_now(); break;
+    case 5:   // F
+        t0 = fine_now();
+        for (int i = 0; i < NL; i++) { work_block(i); if ((i & 3) == 3) atari_copy16(st_al + (i - 3), fast_img + (i - 3), 1); }
+        t1 = fine_now(); break;
+    case 6:   // G
+    case 7:   // H
+    {
+        uint16_t* dst = g_test == 6 ? st_screen : fast_screen;
+        std::memcpy(shadow, shadow_ref, 320 * 224 * 2);
+        t0 = fine_now();
+        for (int r = 0; r < 224; r++) atari_truecolor_diff(idx + r * 320, shadow + r * 320, pal, dst + r * 320, 160);
+        t1 = fine_now(); break;
+    }
     default:  // D
     {
         for (int i = 0; i < NL; i++) { job[2 * i] = (uint32_t)(st_buf + i); job[2 * i + 1] = (uint32_t)i; }
@@ -102,7 +135,21 @@ int main(int argc, char** argv)
     fast_src = (uint32_t*)Mxalloc(0x4000 * 4 + 64, 3);
     fast_dst = (uint32_t*)Mxalloc(0x4000 * 4 + 64, 3);
     job = (uint32_t*)Mxalloc(NL * 8 + 16, 3);
-    if (!st_buf || !fast_src || !fast_dst || !job || (long)st_buf < 0) { if (f) { std::fprintf(f, "STOVL: no memory\r\n"); std::fclose(f); } return 2; }
+    fast_img = (uint32_t*)Mxalloc(NL * 4 + 16, 3);
+    idx = (uint16_t*)Mxalloc(320 * 224 * 2, 3);
+    shadow_ref = (uint16_t*)Mxalloc(320 * 224 * 2, 3);
+    shadow = (uint16_t*)Mxalloc(320 * 224 * 2, 3);
+    pal = (uint16_t*)Mxalloc(8192 * 2, 3);
+    st_screen = (uint16_t*)Mxalloc(320 * 224 * 2, 0);
+    fast_screen = (uint16_t*)Mxalloc(320 * 224 * 2, 3);
+    if (!st_buf || !fast_src || !fast_dst || !job || !fast_img || !idx || !shadow_ref || !shadow || !pal || !st_screen || !fast_screen
+        || (long)st_buf < 0 || (long)st_screen < 0) { if (f) { std::fprintf(f, "STOVL: no memory\r\n"); std::fclose(f); } return 2; }
+    st_al = (uint32_t*)(((uint32_t)st_buf + 15) & ~15u);
+    fast_img = (uint32_t*)(((uint32_t)fast_img + 15) & ~15u);
+    for (int i = 0; i < NL; i++) fast_img[i] = (uint32_t)i * 40503u;
+    for (int i = 0; i < 8192; i++) pal[i] = (uint16_t)(i * 7);
+    for (int i = 0; i < 320 * 224; i++) idx[i] = (uint16_t)(((uint32_t)i * 2654435761u >> 19) & 0x1fff);
+    for (int i = 0; i < 320 * 224; i++) shadow_ref[i] = ((i >> 1) & 1) ? (uint16_t)(idx[i] ^ 1) : idx[i];   // every other pair differs
     for (int i = 0; i < 0x4000; i++) fast_src[i] = (uint32_t)i * 2654435761u;
     char l[160];
     const uint32_t A = measure(0, 1), B = measure(1, 1), C = measure(2, 1);
@@ -120,6 +167,14 @@ int main(int argc, char** argv)
                      (long)(((long)A + (long)B - (long)D) * 100 / (long)(mn ? mn : 1)));
         std::printf("%s\r\n", l); if (f) std::fprintf(f, "%s\r\n", l);
     }
+    const uint32_t E = measure(4, 1), F = measure(5, 1);
+    std::sprintf(l, "STOVL move16_E_us=%lu move16_spread_F_us=%lu overlap_F_pct=%ld", (unsigned long)(E * 2604 / 100), (unsigned long)(F * 2604 / 100),
+                 (long)(((long)E + (long)B - (long)F) * 100 / (long)((E < B ? E : B) ? (E < B ? E : B) : 1)));
+    std::printf("%s\r\n", l); if (f) std::fprintf(f, "%s\r\n", l);
+    const uint32_t G = measure(6, 1), H = measure(7, 1);
+    std::sprintf(l, "STOVL conv_st_G_us=%lu conv_fast_H_us=%lu st_share_us=%ld", (unsigned long)(G * 2604 / 100), (unsigned long)(H * 2604 / 100),
+                 (long)(((long)G - (long)H) * 2604 / 100));
+    std::printf("%s\r\n", l); if (f) std::fprintf(f, "%s\r\n", l);
     if (f) std::fclose(f);
     if (!automatic) { std::printf("Press a key.\r\n"); Cconin(); }
     return 0;
