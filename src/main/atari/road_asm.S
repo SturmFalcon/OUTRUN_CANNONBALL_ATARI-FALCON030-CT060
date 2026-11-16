@@ -23,6 +23,132 @@
 | ---------------------------------------------------------------------------
 | dst[0..count) = (uint16_t)color, two pixels per long write.
 | ---------------------------------------------------------------------------
+#if defined(__mc68040__) || defined(__mc68060__)
+| 68040/68060 versions (CT60 work): the destination is first brought to a long-word boundary,
+| then two pixels go per long write, with the fill unrolled by four longs. Same results.
+	.globl	_atari_fill16
+_atari_fill16:
+	move.l	%d2,-(%sp)
+	move.l	8(%sp),%a0
+	move.l	12(%sp),%d0
+	move.l	16(%sp),%d1
+	move.w	%d0,%d2
+	swap	%d0
+	move.w	%d2,%d0			| d0 = colour:colour
+	move.l	%a0,%d2
+	btst	#1,%d2
+	beq.s	1f
+	move.w	%d0,(%a0)+		| to a long-word boundary
+	subq.l	#1,%d1
+1:	move.l	%d1,%d2			| for the tail
+	lsr.l	#3,%d1			| groups of 8 pixels
+	beq.s	3f
+	subq.l	#1,%d1
+fl_loop:
+	move.l	%d0,(%a0)+
+	move.l	%d0,(%a0)+
+	move.l	%d0,(%a0)+
+	move.l	%d0,(%a0)+
+	dbra	%d1,fl_loop
+3:	btst	#2,%d2
+	beq.s	4f
+	move.l	%d0,(%a0)+
+	move.l	%d0,(%a0)+
+4:	btst	#1,%d2
+	beq.s	5f
+	move.l	%d0,(%a0)+
+5:	btst	#0,%d2
+	beq.s	6f
+	move.w	%d0,(%a0)+
+6:	move.l	(%sp)+,%d2
+	rts
+
+| dst[i] = tab[src[i]], two pixels per long write.
+	.globl	_atari_road_copy1
+_atari_road_copy1:
+	movem.l	%d2-%d3/%a2,-(%sp)		| 12 bytes
+	move.l	16(%sp),%a0
+	move.l	20(%sp),%a1
+	move.l	24(%sp),%a2
+	move.l	28(%sp),%d1
+	moveq	#0,%d0
+	moveq	#0,%d2
+	move.l	%a0,%d3
+	btst	#1,%d3
+	beq.s	1f
+	move.b	(%a1)+,%d0
+	move.w	(%a2,%d0.w*2),(%a0)+
+	subq.l	#1,%d1
+	beq.s	9f
+1:	move.l	%d1,%d3
+	lsr.l	#1,%d1
+	beq.s	3f
+	subq.l	#1,%d1
+c1_loop:
+	move.b	(%a1)+,%d0
+	move.b	(%a1)+,%d2
+	move.w	(%a2,%d0.w*2),%d0
+	swap	%d0
+	move.w	(%a2,%d2.w*2),%d0
+	move.l	%d0,(%a0)+
+	moveq	#0,%d0
+	dbra	%d1,c1_loop
+3:	btst	#0,%d3
+	beq.s	9f
+	move.b	(%a1)+,%d0
+	move.w	(%a2,%d0.w*2),(%a0)+
+9:	movem.l	(%sp)+,%d2-%d3/%a2
+	rts
+
+| dst[i] = lut64[s0[i]*8 + s1[i]], two pixels per long write.
+	.globl	_atari_road_copy2
+_atari_road_copy2:
+	movem.l	%d2-%d4/%a2-%a3,-(%sp)		| 20 bytes
+	move.l	24(%sp),%a0
+	move.l	28(%sp),%a1
+	move.l	32(%sp),%a2
+	move.l	36(%sp),%a3
+	move.l	40(%sp),%d1
+	moveq	#0,%d0
+	moveq	#0,%d2
+	move.l	%a0,%d3
+	btst	#1,%d3
+	beq.s	1f
+	move.b	(%a1)+,%d0
+	lsl.w	#3,%d0
+	add.b	(%a2)+,%d0
+	move.w	(%a3,%d0.w*2),(%a0)+
+	moveq	#0,%d0
+	subq.l	#1,%d1
+	beq.s	9f
+1:	move.l	%d1,%d3
+	lsr.l	#1,%d1
+	beq.s	3f
+	subq.l	#1,%d1
+c2_loop:
+	move.b	(%a1)+,%d0
+	move.b	(%a1)+,%d2
+	lsl.w	#3,%d0
+	lsl.w	#3,%d2
+	add.b	(%a2)+,%d0
+	add.b	(%a2)+,%d2
+	move.w	(%a3,%d0.w*2),%d4
+	swap	%d4
+	move.w	(%a3,%d2.w*2),%d4
+	move.l	%d4,(%a0)+
+	moveq	#0,%d0
+	moveq	#0,%d2
+	dbra	%d1,c2_loop
+3:	btst	#0,%d3
+	beq.s	9f
+	move.b	(%a1)+,%d0
+	lsl.w	#3,%d0
+	add.b	(%a2)+,%d0
+	move.w	(%a3,%d0.w*2),(%a0)+
+9:	movem.l	(%sp)+,%d2-%d4/%a2-%a3
+	rts
+
+#else
 	.globl	_atari_fill16
 _atari_fill16:
 	move.l	%d2,-(%sp)
@@ -89,6 +215,8 @@ c2_loop:
 	dbra	%d1,c2_loop
 	movem.l	(%sp)+,%a2-%a3
 	rts
+
+#endif
 
 | ---------------------------------------------------------------------------
 | void atari_road_offset(int16_t* dst, const int16_t* src, int32_t inc, uint32_t invert)
