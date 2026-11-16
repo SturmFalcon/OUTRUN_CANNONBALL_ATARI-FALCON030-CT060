@@ -631,9 +631,11 @@ void Render::draw_frame(uint16_t* pixels)
         }
         frames++;
         if (!ok) bad++;
-        if ((frames % 20) == 0)
+        if ((frames % 100) == 0)
         {
-            FILE* f = std::fopen("ROWCHECK.TXT", "a");
+            // JOURNAUX\ (test bench convention: only that folder comes back from the real Falcon).
+            Dcreate("JOURNAUX");
+            FILE* f = std::fopen("JOURNAUX\\ROWCHECK.TXT", "a");
             if (f) { std::fprintf(f, "ROWCHECK frames=%d bad=%d\r\n", frames, bad); std::fclose(f); }
         }
     }
