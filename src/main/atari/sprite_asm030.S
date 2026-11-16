@@ -70,6 +70,8 @@
 	.equ	R_TTAB,96
 	.equ	R_DEC,100		| span renderer: sprite bytes of this bank (0 = not used)
 	.equ	R_ENDTAB,104		| span renderer: words up to the end of the row, per word
+	.equ	R_LEAD,108		| span renderer: first opaque nibble of the row from each word (-1 none), 0 = no table
+	.equ	R_LAST,112		| span renderer: last opaque nibble of the row from each word
 
 | void atari_sprite_rows(void);   (extern "C")
 |
@@ -560,7 +562,40 @@ span_row:
 5:	cmp.l	%d2,%d6
 	ble.s	7f
 	move.l	%d2,%d6				| no further than the row
-7:	sub.l	%d5,%d6				| pixels to draw
+7:
+#ifndef SPR_NOTRIM
+	| Only the pixels between the row's first and last opaque nibbles (lead, last):
+	| k >= ceil(lead * 0x200 / hzoom) and k < ceil((last + 1) * 0x200 / hzoom).
+	move.l	_atari_sr+R_LEAD,%d0
+	beq.s	9f				| no tables
+	move.l	%d0,%a1
+	move.l	_atari_sr+R_ADDR,%d0
+	moveq	#0,%d4
+	move.w	(%a1,%d0.l*2),%d4
+	bmi	span_none			| nothing opaque in this row (-1: bit 15 set)
+	lsl.l	#8,%d4
+	add.l	%d4,%d4				| lead * 0x200
+	add.l	%d3,%d4
+	subq.l	#1,%d4
+	divu.l	%d3,%d4
+	cmp.l	%d4,%d5
+	bge.s	8f
+	move.l	%d4,%d5
+8:	move.l	_atari_sr+R_LAST,%a1
+	moveq	#0,%d4
+	move.w	(%a1,%d0.l*2),%d4
+	addq.l	#1,%d4
+	lsl.l	#8,%d4
+	add.l	%d4,%d4				| (last + 1) * 0x200
+	add.l	%d3,%d4
+	subq.l	#1,%d4
+	divu.l	%d3,%d4
+	cmp.l	%d4,%d6
+	ble.s	9f
+	move.l	%d4,%d6
+9:
+#endif
+	sub.l	%d5,%d6				| pixels to draw
 	ble	span_none
 	move.l	%d3,%d2
 	lsl.l	#7,%d2				| source step per pixel, 16.16

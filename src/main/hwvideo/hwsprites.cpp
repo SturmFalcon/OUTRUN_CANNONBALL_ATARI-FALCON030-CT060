@@ -223,6 +223,7 @@ struct SprRows
     const unsigned char* rowdraw;  uint16_t* endslot;
     int32_t sprstep, pstep;  uint32_t hzoom, color, shadow;  const uint16_t* ttab;
     const uint8_t* dec;  const uint16_t* endtab;   // span renderer (see spr_dec below), 0 = not used
+    const int16_t* lead; const int16_t* last;      // opaque extent of the row from each word (spr_lead*)
 };
 extern "C" { SprRows atari_sr; void atari_sprite_rows(void); }
 
@@ -236,6 +237,14 @@ extern "C" { SprRows atari_sr; void atari_sprite_rows(void); }
 static uint8_t*  spr_dec  = 0;
 static uint16_t* spr_endf = 0;
 static uint16_t* spr_endb = 0;
+// For every source word, the row that starts there in reading order (forwards, or backwards for
+// flipped sprites): index of its first and of its last opaque nibble (not 0, not 15), or -1 for a
+// row with none. The span renderer draws only the screen pixels between them: about 60 % of the
+// pixels it visited were transparent [H], most of them at the ends of the rows.
+static int16_t* spr_leadf = 0;
+static int16_t* spr_lastf = 0;
+static int16_t* spr_leadb = 0;
+static int16_t* spr_lastb = 0;
 static const uint32_t SPR_PAD = 4096 * 8;   // bytes of padding around spr_dec (rows read past a bank)
 static const uint16_t SPR_ENDCAP = 4095;    // longest row, in words (keeps nibble indices < 32768)
 
@@ -270,6 +279,62 @@ static void spr_build(const uint32_t* sprites, uint32_t n)
         run = ((sprites[i] & 0x0f000000) == 0x0f000000) ? 1 : (run < SPR_ENDCAP ? run + 1 : SPR_ENDCAP);
         spr_endb[i] = (uint16_t)run;
     }
+#ifndef SPR_NOTRIM
+    spr_leadf = (int16_t*)std::malloc(n * 2);
+    spr_lastf = (int16_t*)std::malloc(n * 2);
+    spr_leadb = (int16_t*)std::malloc(n * 2);
+    spr_lastb = (int16_t*)std::malloc(n * 2);
+    if (!spr_leadf || !spr_lastf || !spr_leadb || !spr_lastb)
+    {
+        std::free(spr_leadf); std::free(spr_lastf); std::free(spr_leadb); std::free(spr_lastb);
+        spr_leadf = spr_lastf = spr_leadb = spr_lastb = 0;
+        return;
+    }
+    // Forwards: word i, then i+1 ...; nibbles MSB first (j = 0..7). The row from i is endf[i]
+    // words long; when that reaches the cap the row is cut there (as the renderer cuts it).
+    for (uint32_t i = n; i-- > 0; )
+    {
+        int first = -1, lastj = -1;
+        for (int j = 0; j < 8; j++)
+        {
+            const uint32_t v = (sprites[i] >> (28 - 4 * j)) & 15;
+            if (v != 0 && v != 15) { if (first < 0) first = j; lastj = j; }
+        }
+        const bool more = spr_endf[i] > 1 && i + 1 < n;
+        int lead = first, last = lastj;
+        if (more)
+        {
+            const int nl = spr_leadf[i + 1], nt = spr_lastf[i + 1];
+            if (lead < 0 && nl >= 0) lead = 8 + nl;
+            if (nt >= 0) last = 8 + nt;
+        }
+        // the next word's row may be longer than this one's remainder only at the cap: be safe
+        if (spr_endf[i] >= SPR_ENDCAP) { lead = 0; last = 8 * SPR_ENDCAP - 1; }
+        spr_leadf[i] = (int16_t)(lead > 32767 ? 32767 : lead);
+        spr_lastf[i] = (int16_t)(last > 32767 ? 32767 : last);
+    }
+    // Backwards: word i, then i-1 ...; nibbles LSB first (MSB-first index 7..0).
+    for (uint32_t i = 0; i < n; i++)
+    {
+        int first = -1, lastj = -1;
+        for (int j = 0; j < 8; j++)
+        {
+            const uint32_t v = (sprites[i] >> (4 * j)) & 15;
+            if (v != 0 && v != 15) { if (first < 0) first = j; lastj = j; }
+        }
+        const bool more = spr_endb[i] > 1 && i > 0;
+        int lead = first, last = lastj;
+        if (more)
+        {
+            const int nl = spr_leadb[i - 1], nt = spr_lastb[i - 1];
+            if (lead < 0 && nl >= 0) lead = 8 + nl;
+            if (nt >= 0) last = 8 + nt;
+        }
+        if (spr_endb[i] >= SPR_ENDCAP) { lead = 0; last = 8 * SPR_ENDCAP - 1; }
+        spr_leadb[i] = (int16_t)(lead > 32767 ? 32767 : lead);
+        spr_lastb[i] = (int16_t)(last > 32767 ? 32767 : last);
+    }
+#endif
 }
 #endif
 #endif
@@ -396,6 +461,8 @@ void hwsprites::render(const uint8_t priority)
             atari_sr.hzoom = hzoom;  atari_sr.color = color;  atari_sr.shadow = shadow;  atari_sr.ttab = ttab;
             atari_sr.dec = spr_dec ? spr_dec + 0x10000 * 8 * bank : 0;
             atari_sr.endtab = spr_dec ? (flip ? spr_endb : spr_endf) + 0x10000 * bank : 0;
+            atari_sr.lead = spr_leadf ? (flip ? spr_leadb : spr_leadf) + 0x10000 * bank : 0;
+            atari_sr.last = spr_leadf ? (flip ? spr_lastb : spr_lastf) + 0x10000 * bank : 0;
             atari_sprite_rows();
             continue;
         }
