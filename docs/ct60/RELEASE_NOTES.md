@@ -21,7 +21,8 @@ Version de travail, non publiée. Mesures [H] = Hatari 060/32 MHz ; rien de mesu
 - Conversion couleur : deux paires de pixels par tour (−2 %).
 - Tuiles : recherche de la tuile sans appel par colonne (−5 %).
 - Route : deux pixels par mot de source (−1,4 %).
-- Rendu d'une image : ≈ 45 → 36,5 ms ; AUTO pleine qualité 14,4 → 18,3 i/s (83 % des images à 20 i/s).
+- Tuiles transparentes sans appel (−2,5 %), contrôles de ligne hors boucle, mixage PCM, conversion sans comparaison de ligne entière (040/060).
+- Rendu d'une image : ≈ 45 → 35,1 ms ; AUTO pleine qualité 14,4 → 18,4 i/s (83 % des images à 20 i/s).
 
 ## Corrections
 - Pixels faux avec la boucle VBL (adresse écran TOS $45E).

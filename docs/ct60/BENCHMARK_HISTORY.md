@@ -16,6 +16,10 @@ Données brutes et MD5 : `/mnt/project-files/cannonball-ct60/mesures/`.
 | 16/11 | 7f86484 | conversion couleur, deux paires par tour | 39,0 ms | 16,7 i/s, 0 retard | non mesuré |
 | 16/11 | c34a268 | tuiles, recherche en ligne | 37,0 ms | 18,2 i/s, 0 retard | non mesuré |
 | 16/11 | 62db2f7 | route, deux index par mot | **36,5 ms** | **18,3 i/s**, 0 retard | non mesuré |
-| 16/11 | (abandonné) | sprites, division 16 bits | 38,1 ms | 16,9 i/s | non mesuré |
+| 16/11 | 582233f | sprites, division 16 bits [EXPÉRIMENTAL] | 38,1 ms | 16,9 i/s | non mesuré |
+| 16/11 | (soir) | tuiles transparentes sans appel | 35,6 ms | 18,4 i/s | non mesuré |
+| 16/11 | | tuiles, contrôles par ligne | 35,4 ms | 18,4 i/s | non mesuré |
+| 16/11 | | son PCM | 35,3 ms | 18,4 i/s | non mesuré |
+| 16/11 | bcd0565 | conversion sans comparaison de ligne | **35,1 ms** | **18,4 i/s**, 0 retard | non mesuré |
 
 Détail par piste : CT60_60MHZ_OPTIMIZATION.md. Cadences détaillées : FPS_BENCHMARKS.md.

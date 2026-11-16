@@ -7,7 +7,7 @@ Tags : **[H]** mesuré sous Hatari (060 à 32 MHz, cpu-exact, VGA, EmuTOS 1.3) ;
 CT60 (aucune mesure à ce jour) ; **[HYPOTHÈSE]** estimation.
 
 ## Classement
-- [H-VALIDÉ] : #1, #2, #4 à #8 (actifs par défaut).
+- [H-VALIDÉ] : #1, #2, #4 à #8, #12 à #15 (actifs par défaut).
 - [EXPÉRIMENTAL] : #3 pompe (`stpump`), #9, #10, #11, `-DMOVE16` (coupés ; départagés sur la vraie CT60).
 - [RCT60-VALIDÉ] : aucun à ce jour.
 - Règle du 16/11 (STurm) : une variante plus lente sous Hatari n'est plus supprimée ; elle reste en option
@@ -40,12 +40,16 @@ CT60 (aucune mesure à ce jour) ; **[HYPOTHÈSE]** estimation.
 | 5 | c402bd2 | route : écritures longues alignées, remplissage déroulé ×4 (040/060) | 39,7 ms | −1 % | identiques |
 | 6 | 7f86484 | conversion couleur : deux paires par tour, comparées avant toute écriture (040/060) | 39,0 ms | −2 % | écran identique (ROWCHECK 0/2500) |
 | 7 | c34a268 | tuiles : recherche de la tuile en ligne, sans appel par colonne | 37,0 ms | −5 % | identiques |
-| 8 | 62db2f7 | route : les deux index de la table tirés d'un mot de chaque source | **36,5 ms** | −1,4 % | identiques |
+| 8 | 62db2f7 | route : les deux index de la table tirés d'un mot de chaque source | 36,5 ms | −1,4 % | identiques |
 | 9 | 582233f | sprites : division 16 bits (`-DSPR_DIVW`) | 38,1 ms | +4 % | identiques ; [EXPÉRIMENTAL], coupé |
 | 10 | 1e999aa | conversion : blocs de 16 octets changés en MOVE16 (`-DMOVE16_DIFF`) | 35,6 ms | −2,5 % sous Hatari | écran exact ; [EXPÉRIMENTAL], coupé (Hatari n'émule pas le bus) |
+| 12 | (16/11 soir) | tuiles : pas d'appel pour une tuile entièrement transparente | 35,6 ms | −2,5 % | identiques |
+| 13 | | tuiles : contrôles de ligne sortis de la boucle des colonnes | 35,4 ms | −0,6 % | identiques |
+| 14 | | son PCM : effacement de registre sorti de la boucle | 35,3 ms | −0,3 % | son identique (PCMCHECK 0/15000) |
+| 15 | bcd0565 | conversion 040/060 : plus de comparaison de ligne entière, la copie Fast suffit | **35,1 ms** | −0,6 % | écran exact (ROWCHECK 0/4100) |
 | 11 | 4a7d700 | sprites : rangées vides quittées avant les divisions (`-DSPR_EARLYNONE`) | 36,6 ms | neutre | identiques ; [EXPÉRIMENTAL], coupé |
 
-Total depuis la boucle adaptative : **≈ 45 → 36,5 ms par image [H] (−19 %)**, sans perte de qualité.
+Total depuis la boucle adaptative : **≈ 45 → 35,1 ms par image [H] (−22 %)**, sans perte de qualité.
 
 Cadence AUTO pleine qualité [H] :
 - avant (6f00ae3) : 14,4 i/s, presque tout à 15 i/s ;
@@ -60,7 +64,7 @@ Cadence AUTO pleine qualité [H] :
 - mixage du son PCM ≈ 3 %
 
 ## Ce que ça donne sur CT60 [HYPOTHÈSE]
-Voir HATARI_CT60_COMPARISON.md : ≈ 28,3 ms par image à 60 MHz (plage 24 à 35), ≈ 25 ms à 75, ≈ 23 ms à 90.
+Voir HATARI_CT60_COMPARISON.md : ≈ 27,4 ms par image à 60 MHz (plage 23,5 à 34), ≈ 24,5 ms à 75, ≈ 22,6 ms à 90.
 Le but A (30 i/s stables à 60 MHz, budget 33,3 ms) est plausible mais pas acquis tant que la vraie CT60 n'a pas
 mesuré. 60 i/s reste hors de portée (voir la même page).
 
