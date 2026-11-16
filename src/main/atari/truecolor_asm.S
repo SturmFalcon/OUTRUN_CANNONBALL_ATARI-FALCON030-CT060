@@ -170,6 +170,68 @@ c16_loop:
 | `shadow` - what dst shows already (video_falcon.cpp keeps one such copy per screen buffer,
 | in fast RAM). Changed pairs are converted, written to dst and copied into shadow; unchanged
 | ones cost a fast-RAM compare instead of a screen write. longs must be 1..65536.
+#if defined(__mc68040__) || defined(__mc68060__)
+| 68040/68060 version: two pairs per turn. When both pairs match the shadow (much of the sky,
+| the road and the scenery from one picture to the next) a turn costs two loads, two compares
+| and no write; otherwise the changed pair(s) are converted and written as before. Same
+| result, word for word, as the one-pair loop below (kept for the 68030).
+	.macro	TVCONV reg
+	move.l	\reg,-4(%a3)
+	move.w	\reg,%d2
+	swap	\reg
+	move.w	(%a1,\reg\().w*2),\reg
+	swap	\reg
+	move.w	(%a1,%d2.w*2),\reg
+	move.l	\reg,(%a2)+
+	.endm
+	.text
+	.even
+	.globl	_atari_truecolor_diff
+_atari_truecolor_diff:
+	movem.l	%d2-%d3/%a2-%a3,-(%sp)		| 4 regs = 16 bytes
+	move.l	20(%sp),%a0			| px
+	move.l	24(%sp),%a3			| shadow
+	move.l	28(%sp),%a1			| pal
+	move.l	32(%sp),%a2			| dst
+	move.l	36(%sp),%d1
+	lsr.l	#1,%d1				| pairs of pairs; carry = one pair left over
+	bcc.s	tw_even
+	move.l	(%a0)+,%d0
+	cmp.l	(%a3)+,%d0
+	beq.s	tw_one_same
+	TVCONV	%d0
+	bra.s	tw_even
+tw_one_same:
+	addq.l	#4,%a2
+tw_even:
+	subq.l	#1,%d1
+	bmi.s	tw_done
+tw_loop:
+	move.l	(%a0)+,%d0
+	move.l	(%a0)+,%d3
+	cmp.l	(%a3)+,%d0
+	bne.s	tw_first
+	cmp.l	(%a3)+,%d3
+	bne.s	tw_second_only
+	addq.l	#8,%a2
+	dbra	%d1,tw_loop
+	bra.s	tw_done
+tw_first:
+	TVCONV	%d0
+	cmp.l	(%a3)+,%d3
+	bne.s	tw_second
+	addq.l	#4,%a2
+	dbra	%d1,tw_loop
+	bra.s	tw_done
+tw_second_only:
+	addq.l	#4,%a2
+tw_second:
+	TVCONV	%d3
+	dbra	%d1,tw_loop
+tw_done:
+	movem.l	(%sp)+,%d2-%d3/%a2-%a3
+	rts
+#else
 	.text
 	.even
 	.globl	_atari_truecolor_diff
@@ -208,3 +270,4 @@ tv_same:
 	dbra	%d1,tv_loop
 	movem.l	(%sp)+,%d2/%a2-%a3
 	rts
+#endif
