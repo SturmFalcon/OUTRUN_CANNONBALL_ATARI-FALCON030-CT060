@@ -364,6 +364,12 @@ void hwtiles::render_tile_layer(uint16_t* buf, uint8_t page_index, uint8_t prior
         uint32_t rowofs = (128 * my) & 0xfff;
         uint32_t base_l = 4096 * ((EffPage >> (my < 32 ? 0 : 8)) & 0x0f) + rowofs;
         uint32_t base_r = 4096 * ((EffPage >> (my < 32 ? 4 : 12)) & 0x0f) + rowofs;
+#ifndef LOWRES
+        // Worked out once per tile row (the calls in the column loop make the compiler reload them).
+        const bool row_inside = y > 7 && y <= (S16_HEIGHT - 8);
+        const uint32_t row_mask = row_inside ? g_tile_mask8[y] : 0;
+        const int16_t x_max = s16_width_noscale - 8;
+#endif
 #if !defined(TILEDEC_OLD) && !defined(TILEDEC_ASM)
         const uint8_t* const row_l = tile_ram + base_l;
         const uint8_t* const row_r = tile_ram + base_r;
@@ -430,9 +436,9 @@ void hwtiles::render_tile_layer(uint16_t* buf, uint8_t page_index, uint8_t prior
             int16_t x = vis_x[k];
 
 #ifndef LOWRES
-            if (x > 7 && x < (s16_width_noscale - 8) && y > 7 && y <= (S16_HEIGHT - 8))
+            if (row_inside && x > 7 && x < x_max)
             {
-                const uint32_t m = g_tile_mask8[y];
+                const uint32_t m = row_mask;
                 if (m == 0xFF)
                     TILE8(row + x, Code, (uint32_t)Colour << 3, W * 2);
                 else if (m)
