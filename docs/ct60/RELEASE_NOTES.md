@@ -18,7 +18,9 @@ Version de travail, non publiée. Mesures [H] = Hatari 060/32 MHz ; rien de mesu
 ## Vitesse [H], images identiques à v0.39
 - Sprites zoomés : boucle par pixel 060 (−3 %) puis rangées réduites à leurs pixels opaques (−10 %).
 - Route : écritures longues alignées (−1 %).
-- Rendu d'une image : ≈ 45 → 39,7 ms ; AUTO pleine qualité 14,4 → 16,1 i/s (la moitié du temps à 20 i/s).
+- Conversion couleur : deux paires de pixels par tour (−2 %).
+- Tuiles : recherche de la tuile sans appel par colonne (−5 %).
+- Rendu d'une image : ≈ 45 → 37,0 ms ; AUTO pleine qualité 14,4 → 18,2 i/s (81 % des images à 20 i/s).
 
 ## Corrections
 - Pixels faux avec la boucle VBL (adresse écran TOS $45E).

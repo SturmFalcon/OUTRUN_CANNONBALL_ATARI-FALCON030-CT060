@@ -30,27 +30,28 @@ CT60 (aucune mesure à ce jour) ; **[HYPOTHÈSE]** estimation.
 | 2 | 6e12bf0 | correctif VBL : `$45E` laissé à 0, registres Videl seuls | sans effet sur le coût | — | **corrige** 220/500 images fausses (ROWCHECK) |
 | 3 | 3545057 | pompe d'écriture ST (`stpump`, coupée par défaut) | +5 ms sous Hatari | voir ST_WRITE_OVERLAP.md | identiques, PUMPCHECK 0 erreur |
 | 4 | 44189bd | sprites : chaque rangée réduite à ses pixels opaques | **40,1 ms** | **−10 %** | identiques |
-| 5 | c402bd2 | route : écritures longues alignées, remplissage déroulé ×4 (040/060) | **39,7 ms** | −1 % | identiques |
+| 5 | c402bd2 | route : écritures longues alignées, remplissage déroulé ×4 (040/060) | 39,7 ms | −1 % | identiques |
+| 6 | 7f86484 | conversion couleur : deux paires par tour, comparées avant toute écriture (040/060) | 39,0 ms | −2 % | écran identique (ROWCHECK 0/2500) |
+| 7 | c34a268 | tuiles : recherche de la tuile en ligne, sans appel par colonne | **37,0 ms** | −5 % | identiques |
 
-Total depuis la boucle adaptative : **≈ 45 → 39,7 ms par image [H] (−12 %)**, sans perte de qualité.
+Total depuis la boucle adaptative : **≈ 45 → 37,0 ms par image [H] (−18 %)**, sans perte de qualité.
 
 Cadence AUTO pleine qualité [H] :
 - avant (6f00ae3) : 14,4 i/s, presque tout à 15 i/s ;
-- après (c402bd2) : **16,1 i/s**, 183 images à 20 i/s, 169 à 15, 0 image sautée, 0 en retard.
+- après la route (c402bd2) : 16,1 i/s, 183 images à 20 i/s, 169 à 15 ;
+- après les tuiles (c34a268) : **18,2 i/s**, 323 images à 20 i/s, 52 à 15, 0 image sautée, 0 en retard.
 
-## Profil restant [H] (après #5)
+## Profil restant [H] (après #5, avant #6 et #7)
 - conversion couleur + écriture ST (`tv_loop`) ≈ 21 %
 - route ≈ 11 %, tuiles ≈ 10 %
 - préparation de chaque rangée de sprite (3 divisions `divu.l`) ≈ 5 %
 - mixage du son PCM ≈ 3 %
 
 ## Ce que ça donne sur CT60 [HYPOTHÈSE]
-Voir HATARI_CT60_COMPARISON.md : ≈ 29,5 ms par image à 60 MHz (plage 25 à 37), ≈ 26 ms à 75, ≈ 24 ms à 90.
+Voir HATARI_CT60_COMPARISON.md : ≈ 28,3 ms par image à 60 MHz (plage 24 à 35), ≈ 25 ms à 75, ≈ 23 ms à 90.
 Le but A (30 i/s stables à 60 MHz, budget 33,3 ms) est plausible mais pas acquis tant que la vraie CT60 n'a pas
 mesuré. 60 i/s reste hors de portée (voir la même page).
 
 ## Pistes suivantes
-1. Tuiles : décodage et index par tuile.
-2. Conversion couleur : boucle `tv_loop` (lecture de comparaison, écriture longue alignée).
-3. Préparation des rangées de sprites : moins de divisions.
-4. Pompe : liste par plages plutôt que par paires (adresse, valeur), pour le test sur vraie CT60.
+1. Préparation des rangées de sprites : moins de divisions.
+2. Pompe : liste par plages plutôt que par paires (adresse, valeur), pour le test sur vraie CT60.

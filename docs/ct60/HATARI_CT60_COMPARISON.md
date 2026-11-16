@@ -12,15 +12,15 @@ différente) ne sont **pas** repris tels quels.
 | c2p vers ST | 0,85 à 0,91 |
 
 ## Estimation Cannonball sur CT60 [HYPOTHÈSE]
-Rendu [H] après les optimisations (c402bd2) ≈ 39,7 ms = ≈ 36,3 ms de calcul + ≈ 3,4 ms d'écriture ST (72 Ko).
+Rendu [H] après les optimisations (c34a268) ≈ 37,0 ms = ≈ 33,6 ms de calcul + ≈ 3,4 ms d'écriture ST (72 Ko).
 Le calcul suit les MHz du 68060 (rapport 2,2 mesuré à la fréquence de la CT60 de STurm, supposée 60 MHz),
 pas l'écriture ST (bus du Falcon, ≈ 5,6 Mo/s mesurés).
 
 | CT60 | calcul | écriture ST | total par image | budget 30 i/s (33,3 ms) |
 |---|---|---|---|---|
-| 60 MHz | ≈ 16,5 ms (12-24) | ≈ 13 ms | ≈ 29,5 ms (25-37) | tenu au milieu de la plage, pas au pire |
-| 75 MHz | ≈ 13 ms | ≈ 13 ms | ≈ 26 ms | tenu |
-| 90 MHz | ≈ 11 ms | ≈ 13 ms | ≈ 24 ms | tenu, ≈ 9 ms de marge |
+| 60 MHz | ≈ 15,3 ms (11-22) | ≈ 13 ms | ≈ 28,3 ms (24-35) | tenu sauf au pire de la plage |
+| 75 MHz | ≈ 12 ms | ≈ 13 ms | ≈ 25 ms | tenu |
+| 90 MHz | ≈ 10 ms | ≈ 13 ms | ≈ 23 ms | tenu, ≈ 10 ms de marge |
 
 Avant les optimisations de rendu (653ed94) : ≈ 32 ms (27-41) à 60 MHz.
 
