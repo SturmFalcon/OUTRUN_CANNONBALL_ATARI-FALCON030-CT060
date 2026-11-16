@@ -12,8 +12,7 @@ static volatile uint32_t pend_base = 0, pend_target = 0;
 static volatile bool pend = false;
 static void (**g_slot)() = 0;
 
-// Called by TOS at every VBL (registers saved by TOS). The new base is written to the
-// Videl and to screenpt ($45E), so TOS's own VBL code keeps the same address.
+// Called by TOS at every VBL (registers saved by TOS). The new base is written to the Videl.
 static void vsync_vbl()
 {
     const uint32_t v = ++g_vbl;
@@ -23,7 +22,11 @@ static void vsync_vbl()
         *(volatile uint8_t*)0xFFFF8201L = (uint8_t)(b >> 16);
         *(volatile uint8_t*)0xFFFF8203L = (uint8_t)(b >> 8);
         *(volatile uint8_t*)0xFFFF820DL = (uint8_t)b;
-        *(volatile uint32_t*)0x45EL = b;
+        // screenpt ($45E) must NOT receive our buffers: TOS then treats the buffer as its own
+        // screen (measured [H]: 44 % of the pictures had wrong pixels, ROWCHECK, with every
+        // picture right once it was left alone). It is cleared instead, so that no older
+        // Setscreen request can bring the previous screen back at a later VBL.
+        *(volatile uint32_t*)0x45EL = 0;
         pend = false;
     }
 }
