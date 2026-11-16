@@ -12,7 +12,7 @@ différente) ne sont **pas** repris tels quels.
 | c2p vers ST | 0,85 à 0,91 |
 
 ## Estimation Cannonball sur CT60 [HYPOTHÈSE]
-Rendu [H] après les optimisations (c34a268) ≈ 37,0 ms = ≈ 33,6 ms de calcul + ≈ 3,4 ms d'écriture ST (72 Ko).
+Rendu [H] après les optimisations (c34a268 ; 36,5 ms à 62db2f7, même estimation à 0,2 ms près) ≈ 37,0 ms = ≈ 33,6 ms de calcul + ≈ 3,4 ms d'écriture ST (72 Ko).
 Le calcul suit les MHz du 68060 (rapport 2,2 mesuré à la fréquence de la CT60 de STurm, supposée 60 MHz),
 pas l'écriture ST (bus du Falcon, ≈ 5,6 Mo/s mesurés).
 

@@ -21,7 +21,9 @@ Données brutes : `/mnt/project-files/cannonball-ct60/mesures/` (dossiers datés
 | 15 fixe, sprites réduits + route (c402bd2) | VBL, n=4 | 14,9 | 400 × 15 i/s, 1 en retard | 29,9 | 44,2 / 52 / 59 ms (rendu 39,7) |
 | AUTO, sprites réduits + route (c402bd2) | VBL, n auto | 16,1 | 183 × 20 i/s, 169 × 15, 36 × 12, 12 × 10, **0 retard, 0 sautée** | 29,9 | 44,6 / 53 / 59 ms |
 | 15 fixe, + conversion + tuiles (c34a268) | VBL, n=4 | 14,9 | 400 × 15 i/s, 3 en retard | 29,9 | 41,5 / 50 / 56 ms (rendu 37,0) |
-| **AUTO, + conversion + tuiles (c34a268)** | VBL, n auto | **18,2** | 323 × 20 i/s, 52 × 15, 25 × 12, **0 retard, 0 sautée** | 29,9 | 40,5 / 49 / 55 ms |
+| AUTO, + conversion + tuiles (c34a268) | VBL, n auto | 18,2 | 323 × 20 i/s, 52 × 15, 25 × 12, **0 retard, 0 sautée** | 29,9 | 40,5 / 49 / 55 ms |
+| 15 fixe, + route deux index (62db2f7) | VBL, n=4 | 14,9 | 400 × 15 i/s, 4 en retard | 29,9 | 41,0 / 49 / 58 ms (rendu 36,5) |
+| **AUTO, + route deux index (62db2f7)** | VBL, n auto | **18,3** | 331 × 20 i/s, 45 × 15, 24 × 12, **0 retard, 0 sautée** | 29,9 | 39,9 / 48 / 54 ms |
 
 « images à durée exacte » : images restées à l'écran exactement le nombre de VBL de leur niveau (journal CADENCE) ;
 les autres sont les changements de niveau du début (AUTO part à 20 i/s sous Hatari puis descend).
