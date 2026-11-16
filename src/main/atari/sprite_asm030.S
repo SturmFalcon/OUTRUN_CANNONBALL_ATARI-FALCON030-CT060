@@ -548,6 +548,16 @@ span_row:
 	move.l	_atari_sr+R_SPRDATA,%a1
 	adda.l	%d4,%a1
 	move.l	%a1,0(%sp)
+#if defined(SPR_EARLYNONE) && !defined(SPR_NOTRIM)
+	| [EXPÉRIMENTAL] -DSPR_EARLYNONE: a row with no opaque pixel at all (lead = -1) is left before
+	| any division. Neutral under Hatari (36.6 vs 36.5 ms): off, for the real CT60 campaign.
+	move.l	_atari_sr+R_LEAD,%d4
+	beq.s	1f
+	move.l	%d4,%a1
+	tst.w	(%a1,%d0.l*2)
+	bmi	span_none
+1:
+#endif
 	moveq	#12,%d4				| K = ceil(words * 8 * 0x200 / hzoom)
 	lsl.l	%d4,%d2
 	add.l	%d3,%d2
