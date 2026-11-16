@@ -10,6 +10,7 @@
 
 #ifdef PLATFORM_FALCON
 
+#include "atari/stpump.hpp"
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
@@ -60,6 +61,21 @@ extern "C" void atari_truecolor_diff(const uint16_t* px, uint16_t* shadow, const
 // from that copy: a car moving across a row no longer means rewriting the whole row. 0xFFFF
 // never is an index, so a copy filled with it makes every pixel be written.
 static uint16_t* shadow[3] = { 0, 0, 0 };
+
+// ST write pump (atari/stpump.hpp): the list of (screen address, pair) of the picture drawn last,
+// written during the next one. g_stpump_on is set by main_loop_vsync().
+bool g_stpump_on = false;
+static uint32_t* pump_job = 0;          // fast RAM, 2 longs per screen long
+static uint8_t* pump_pending = 0;       // screen buffer to show once its list is written, or 0
+#ifdef PUMPCHECK
+// Test aid (-DPUMPCHECK): the screen of every picture written through the pump is compared,
+// once fully written, with a plain conversion of its indices (copied at staging time).
+static uint16_t* pc_idx = 0;
+static uint16_t* pc_pal = 0;
+static uint16_t* pc_dst = 0;
+static int pc_stride = 0, pc_frames = 0, pc_bad = 0;
+static uint32_t pc_longs = 0;
+#endif
 #ifdef STWRITE_COUNT
 uint32_t g_st_longs = 0, g_st_rows = 0, g_st_words = 0;   // test aid, see convert_rows_diff()
 #endif
@@ -97,6 +113,12 @@ static void convert_rows_diff(const uint16_t* src, const uint16_t* pal, uint16_t
     }
 #endif
     if (!sh) { convert_rows(src, pal, dst, rows, dst_stride); return; }
+    if (g_stpump_on && pump_job)
+    {
+        for (int q = 0; q < rows; q++)
+            g_pump_end = atari_truecolor_stage(src + q * S16_WIDTH, sh + q * S16_WIDTH, pal, dst + q * dst_stride, S16_WIDTH / 2, g_pump_end);
+        return;
+    }
     for (int q = 0; q < rows; q++)
         atari_truecolor_diff(src + q * S16_WIDTH, sh + q * S16_WIDTH, pal, dst + q * dst_stride, S16_WIDTH / 2);
 }
@@ -396,9 +418,43 @@ void Render::set_shadow_intensity(float f)
     shadow_multi = (int)(255.0f * f);
 }
 
+// ST write pump: writes what is left of the last picture's list and queues that picture for
+// the VBL g_present_vbl. Nothing to do when no picture is waiting.
+void stpump_present_pending()
+{
+    atari_st_flush();
+    if (pump_pending)
+    {
+#ifdef PUMPCHECK
+        if (pc_dst)
+        {
+            bool ok = true;
+            for (int q = 0; q < S16_HEIGHT && ok; q++)
+                for (int x = 0; x < S16_WIDTH; x++)
+                    if (pc_dst[q * pc_stride + x] != pc_pal[pc_idx[q * S16_WIDTH + x]]) { ok = false; break; }
+            pc_frames++;
+            if (!ok) pc_bad++;
+            if (pc_frames % 50 == 0)
+            {
+                FILE* f = std::fopen("PUMPCHK.TXT", "a");
+                if (f) { std::fprintf(f, "PUMPCHECK pictures=%d bad=%d longs_per_pic=%lu\r\n", pc_frames, pc_bad, (unsigned long)(pc_longs / pc_frames)); std::fclose(f); }
+            }
+        }
+#endif
+        vsync_queue(pump_pending, g_present_vbl, g_vsync_idle);
+        pump_pending = 0;
+    }
+}
+
 // Shows the buffer just drawn, from the next vertical blank.
 void Render::flip_screen_base()
 {
+    if (g_vsync_on && g_stpump_on && pump_job)
+    {
+        // Its list is written during the next picture; shown by present_pending().
+        pump_pending = screen_buffer[back_buffer];
+        return;
+    }
     if (g_vsync_on)
     {
         // Paced on the VBL (atari/vsync.hpp): shown exactly at the VBL the game loop chose.
@@ -440,6 +496,26 @@ void Render::draw_frame(uint16_t* pixels)
         pal_dirty = false;
     }
     uint16_t* sh = shadow[draw_buffer];
+    if (g_stpump_on)
+    {
+        if (!pump_job)
+        {
+            const long bytes = (long)S16_WIDTH * S16_HEIGHT * 4 + 64;   // 2 longs per screen long
+            long m = Mxalloc(bytes, 3);                                 // fast RAM if any
+            if (m > 0) pump_job = (uint32_t*)((m + 15) & ~15L);
+        }
+        atari_st_flush();                       // (already written by present_pending())
+        g_pump_rd = g_pump_end = pump_job;
+    }
+#ifdef PUMPCHECK
+    if (g_stpump_on && pump_job && g_row_reduced == 0)
+    {
+        if (!pc_idx) { pc_idx = (uint16_t*)std::malloc(S16_WIDTH * S16_HEIGHT * 2); pc_pal = (uint16_t*)std::malloc(sizeof(rgb565)); }
+        std::memcpy(pc_idx, pixels, S16_WIDTH * S16_HEIGHT * 2);
+        std::memcpy(pc_pal, rgb565, sizeof(rgb565));
+        pc_dst = dst; pc_stride = fal_stride;
+    }
+#endif
 #ifdef NO_TCDIFF
     sh = 0;   // test option: the previous behaviour, whole rows written
 #endif
@@ -479,6 +555,14 @@ void Render::draw_frame(uint16_t* pixels)
         }
     }
 #endif
+#ifdef PUMPCHECK
+    if (g_stpump_on && pump_job) pc_longs += (uint32_t)(g_pump_end - pump_job) / 2;
+#endif
+#ifdef PUMP_IMMEDIATE
+    if (g_stpump_on) atari_st_flush();
+#endif
+    if (g_stpump_on && (pause_engine || g_quit_confirm || g_take_screenshot))
+        atari_st_flush();                       // captions and screenshots work on the screen itself
     if (pause_engine)
         draw_pause_text(dst, fal_stride);
     if (g_quit_confirm)

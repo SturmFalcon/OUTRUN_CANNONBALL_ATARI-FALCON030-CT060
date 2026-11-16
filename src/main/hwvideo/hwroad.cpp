@@ -299,6 +299,7 @@ namespace
 }
 #endif
 #include "atari/options.hpp"   // g_row_draw: rows drawn in a picture (vscale option)
+#include "atari/stpump.hpp"
 void HWRoad::render_background_lores(uint16_t* pixels)
 {
     int x, y;
@@ -306,6 +307,7 @@ void HWRoad::render_background_lores(uint16_t* pixels)
 
     for (y = 0; y < S16_HEIGHT; y++) 
     {
+        st_pump();
         if (!g_row_draw[y]) continue;
         int data0 = roadram[0x000 + y];
         int data1 = roadram[0x100 + y];
@@ -364,6 +366,7 @@ void HWRoad::render_foreground_lores(uint16_t* pixels)
     
     for (y = 0; y < S16_HEIGHT; y++) 
     {
+        st_pump();
         if (!g_row_draw[y]) continue;
         uint16_t color_table[32];
 

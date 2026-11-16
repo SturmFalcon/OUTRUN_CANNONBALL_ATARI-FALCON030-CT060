@@ -651,6 +651,13 @@ done:
 	move.l	_atari_sr+R_ENDSLOT,%a1
 	move.w	%d0,(%a1)
 rows_skip:
+#ifndef PUMP_NOCALLS
+	move.l	_g_pump_rd,%d0			| ST write pump (stpump.hpp): a few longs per sprite row
+	cmp.l	_g_pump_end,%d0
+	bhs.s	1f
+	jsr	_atari_st_pump
+1:
+#endif
 	| accumulate the vertical zoom: addr += pitch * (yacc >> 9), yacc &= 0x1ff
 	move.l	_atari_sr+R_YACC,%d0
 	add.l	_atari_sr+R_VZOOM,%d0

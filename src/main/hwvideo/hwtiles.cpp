@@ -1,3 +1,4 @@
+#include "atari/stpump.hpp"
 #include <cstring> // memcpy
 #include <cstdio>
 #include "globals.hpp"
@@ -349,6 +350,7 @@ void hwtiles::render_tile_layer(uint16_t* buf, uint8_t page_index, uint8_t prior
 
         for (int k = 0; k < nvis; k++)
         {
+            st_pump();
 #ifdef TILEDEC_OLD
             // Test aid (-DTILEDEC_OLD): the original per-column lookup, to compare frame output against.
             int mx = vis_mx[k];

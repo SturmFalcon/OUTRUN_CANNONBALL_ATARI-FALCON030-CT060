@@ -33,6 +33,7 @@
 #include "atari/hwdetect.hpp"
 #include "atari/cadlog.hpp"
 #include "atari/vsync.hpp"
+#include "atari/stpump.hpp"
 
 // Stack size requested from the MiNTLib startup code (__stksize).
 extern "C" long __stksize = 262144L;
@@ -722,6 +723,9 @@ uint32_t g_vsync_missed = 0;                // pictures skipped because the game
 static uint32_t g_halves = 0;
 uint32_t g_shot_tag = 0;
 #endif
+extern bool g_stpump_on;
+void stpump_present_pending();
+
 static void main_loop_vsync()
 {
     static const int N_MAX = 6;             // 10 pictures/s at 60 Hz
@@ -739,6 +743,11 @@ static void main_loop_vsync()
     int phase = 0, renders = 0;
     g_split = true;
     g_half_pending = false;
+    if (atari_opt.stpump > 0 && g_hw.cpu >= 40)
+    {
+        g_pump_k = (uint32_t)(atari_opt.stpump - 1);
+        g_stpump_on = true;
+    }
     g_vsync_missed = 0;
 #ifdef BENCH_N
     uint32_t b_hz = 0, b_steps = 0, b_lvl[N_MAX + 1] = { 0 }, b_missed = 0, b_rmax = 0, b_late = 0;
@@ -807,6 +816,7 @@ static void main_loop_vsync()
         // A whole group late: no picture this time, the game keeps its pace.
         if ((int32_t)(g_vbl - S) >= n)
         {
+            if (g_stpump_on) { g_present_vbl = S + atari_opt.vsync_lat; stpump_present_pending(); }
             g_vsync_missed++;
             miss_hist = (miss_hist << 1) | 1;
 #ifdef BENCH_N
@@ -824,6 +834,7 @@ static void main_loop_vsync()
             if (g_halves > 2400) state = STATE_QUIT;
 #endif
             video.prepare_frame();
+            if (g_stpump_on) stpump_present_pending();   // the picture before: rest of its list, then shown
             video.render_frame();
             // queued at or after its VBL: shown one VBL late (or more)
             const bool late = (int32_t)(g_vbl - g_present_vbl) >= 0;
@@ -916,6 +927,7 @@ static void main_loop_vsync()
         g_vrate_level = n;
     }
 
+    if (g_stpump_on) { stpump_present_pending(); g_stpump_on = false; }
     g_split = false;
     quit_cleanup();
 }

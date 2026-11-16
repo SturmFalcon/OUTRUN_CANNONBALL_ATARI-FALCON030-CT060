@@ -82,6 +82,9 @@
       vrate     0   pictures per second when vsync is on: 0 = AUTO (chosen from the measured
                     cost of each picture, with hysteresis), or 60, 30, 20, 15 fixed. The game
                     speed never changes (one logic step per two VBLs at 60 Hz).
+      stpump    0   with vsync on a 68040/68060: screen writes of a picture spread over the next
+                    picture's drawing, N longs at a time (1..16), to hide the ST-RAM bus behind
+                    the computation (atari/stpump.hpp). 0 = off. Real hardware only can show a gain.
       rompath   roms\  folder of the ROM files, relative to the program (default roms\). A single
                         '.' means the program's own folder, for the ROMs and for tilemap.bin and
                         tilepatch.bin (used by the test bench, which puts every file next to
@@ -125,6 +128,7 @@ struct AtariOptions
     int vsync_lat;                        // VBLs between the end of a step and its picture (0..3)
     char rompath[64];                     // "" = default roms\ ; "." = the program's folder
     int vrate;                            // pictures/s with vsync: 0 = AUTO (default), 60, 30, 20, 15
+    int stpump;                           // ST write pump (atari/stpump.hpp): longs per call, 0 = off
 };
 
 // Joystick sources the joy_* options can name.
