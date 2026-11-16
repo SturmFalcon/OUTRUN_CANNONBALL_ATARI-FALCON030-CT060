@@ -102,8 +102,26 @@ void hw_detect()
     h.profile = profile_for(h.cpu, h.mhz_x10);
 }
 
+#ifdef HWDIAG
+// Test aid (-DHWDIAG, 68040/68060 builds): cache and processor control registers, read once.
+static unsigned long g_cacr = 0, g_pcr = 0;
+static long read_ctl()
+{
+    unsigned long c, p = 0;
+    __asm__ volatile ("movec %%cacr,%0" : "=d"(c));
+#if defined(__mc68060__)
+    __asm__ volatile ("movec %%pcr,%0" : "=d"(p));
+#endif
+    g_cacr = c; g_pcr = p;
+    return 0;
+}
+#endif
+
 void hw_describe(char* buf)
 {
+#ifdef HWDIAG
+    if (g_hw.cpu >= 40) Supexec(read_ctl);
+#endif
     const HwInfo& h = g_hw;
     std::sprintf(buf, "HW cpu=%ld fpu=%lx mch=%lx ct60=%d(%lx) mint=%d st_free=%ld fast_free=%ld "
                  "spin=%lu/%luticks cyc=%lu clock=%lu.%luMHz profile=%s",
@@ -111,6 +129,9 @@ void hw_describe(char* buf)
                  (int)h.mint, h.st_free, h.fast_free,
                  (unsigned long)h.spin_iters, (unsigned long)h.spin_ticks, (unsigned long)h.cycles_per_iter,
                  (unsigned long)(h.mhz_x10 / 10), (unsigned long)(h.mhz_x10 % 10), hw_profile_name(h.profile));
+#ifdef HWDIAG
+    std::sprintf(buf + __builtin_strlen(buf), " cacr=%08lx pcr=%08lx", g_cacr, g_pcr);
+#endif
 }
 
 int hw_start_level()

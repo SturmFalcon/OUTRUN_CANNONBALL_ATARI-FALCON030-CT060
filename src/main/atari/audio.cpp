@@ -258,7 +258,8 @@ void Audio::tick_now()
     sum += dt; if (dt > mx) mx = dt;
     if (++n == 300)
     {
-        FILE* f = fopen("AUDT.TXT", "a");
+        Dcreate("JOURNAUX");
+        FILE* f = fopen("JOURNAUX\\AUDT.TXT", "a");   // test bench brings back JOURNAUX only
         static uint32_t last = 0;
         const uint32_t now = fine_time();
         if (f) { fprintf(f, "fm_dsp=%d tick avg %lu us max %lu us; 300 steps took %lu ms (10000 = real time); per step: driver %lu pcm %lu fm %lu us; .mod replay %lu us; pictures %lu game steps %lu; per picture: prepare %lu us, to screen %lu us; auto rate %lu/2 fps, %lu changes\r\n", fmdsp.active() ? 1 : 0,

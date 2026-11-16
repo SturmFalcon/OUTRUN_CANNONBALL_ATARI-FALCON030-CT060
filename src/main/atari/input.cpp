@@ -264,7 +264,10 @@ void Input::poll()
     // Test aid: the first 5 values read from the enhanced ports, and whether the machine has them.
     {
         static int n = 0;
-        if (n < 5) { n++; Dcreate("JOURNAUX"); FILE* lf = fopen("JOURNAUX\\PADS.TXT", "a"); if (lf) { fprintf(lf, "ext_ports=%d pad=%04x\r\n", (int)ext_ports, (unsigned)pad); fclose(lf); } }
+        n++;
+        int down = 0, first = -1;
+        for (int i = 0; i < NUM_SCANCODES; i++) if (scan_state[i]) { down++; if (first < 0) first = i; }
+        if (n <= 5 || n == 100 || n == 1000 || n == 3000) { Dcreate("JOURNAUX"); FILE* lf = fopen("JOURNAUX\\PADS.TXT", "a"); if (lf) { fprintf(lf, "poll=%d ext_ports=%d pad=%04x joy1=%02x joy0=%02x keys_down=%d first_scancode=%02x\r\n", n, (int)ext_ports, (unsigned)pad, (unsigned)atari_joy1, (unsigned)atari_joy0, down, (unsigned)(first & 0xff)); fclose(lf); } }
     }
 #endif
     // The joysticks are ORed on top of the keyboard so both work at once. Left/right always
