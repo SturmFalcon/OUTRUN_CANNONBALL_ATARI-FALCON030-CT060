@@ -178,7 +178,14 @@ uint16_t Input::read_ext_ports()
     volatile uint16_t* const matrix  = (volatile uint16_t*)0xFFFF9202L;
     static const uint16_t SELECT[4] = { 0xFFEE, 0xFFDD, 0xFFBB, 0xFF77 };   // group 1..4, both ports
     static const uint16_t BUTTON[4] = { PAD_A, PAD_B, PAD_C, PAD_OPTION };
-    uint16_t pad = 0;
+    // An empty enhanced port on a real Falcon does not always read "nothing pressed" (Hatari
+    // always does): seen as up+down held at once, which here meant accelerate + brake, so the car
+    // never moved. Each port is decoded on its own and only counts once it has read fully released
+    // for IDLE_POLLS polls in a row; a port reading up+down or left+right together (impossible on
+    // a stick or a pad) is dropped again until it has been idle that long.
+    enum { IDLE_POLLS = 25 };
+    static int idle_run[2] = { 0, 0 };
+    uint16_t pp[2] = { 0, 0 };
     for (int g = 0; g < 4; g++)
     {
         *matrix = SELECT[g];
@@ -188,20 +195,50 @@ uint16_t Input::read_ext_ports()
         __asm__ volatile ("nop" ::: "memory");
         for (int w = 0; w < 8; w++) (void)*buttons;
         const uint16_t b = (uint16_t)~*buttons;
-        if (b & 0x0A) pad |= BUTTON[g];            // fire line of port A or B
+        if (b & 0x02) pp[0] |= BUTTON[g];          // fire line of port A
+        if (b & 0x08) pp[1] |= BUTTON[g];          // fire line of port B
         if (g == 0)
         {
             const uint16_t d = (uint16_t)~*matrix;
-            if (b & 0x05) pad |= PAD_PAUSE;
-            if (d & 0x1100) pad |= PAD_UP;
-            if (d & 0x2200) pad |= PAD_DOWN;
-            if (d & 0x4400) pad |= PAD_LEFT;
-            if (d & 0x8800) pad |= PAD_RIGHT;
+            for (int q = 0; q < 2; q++)
+            {
+                const int sh = q ? 12 : 8;
+                if (b & (q ? 0x04 : 0x01)) pp[q] |= PAD_PAUSE;
+                if (d & (0x1 << sh)) pp[q] |= PAD_UP;
+                if (d & (0x2 << sh)) pp[q] |= PAD_DOWN;
+                if (d & (0x4 << sh)) pp[q] |= PAD_LEFT;
+                if (d & (0x8 << sh)) pp[q] |= PAD_RIGHT;
+            }
         }
     }
-    *matrix = 0xFFFF;                               // nothing selected
     const uint16_t all = PAD_A | PAD_B | PAD_C | PAD_OPTION;
-    if ((pad & all) == all) pad &= (uint16_t)~(PAD_B | PAD_C | PAD_OPTION);   // plain joystick: one fire button
+    uint16_t pad = 0;
+    for (int q = 0; q < 2; q++)
+    {
+        if ((pp[q] & all) == all) pp[q] &= (uint16_t)~(PAD_B | PAD_C | PAD_OPTION);   // plain joystick: one fire button
+        const bool impossible = ((pp[q] & (PAD_UP | PAD_DOWN)) == (PAD_UP | PAD_DOWN))
+                             || ((pp[q] & (PAD_LEFT | PAD_RIGHT)) == (PAD_LEFT | PAD_RIGHT));
+        if (impossible) { idle_run[q] = 0; continue; }
+        if (idle_run[q] < IDLE_POLLS)
+        {
+            idle_run[q] = pp[q] ? 0 : idle_run[q] + 1;
+            continue;
+        }
+        pad |= pp[q];
+    }
+    *matrix = 0xFFFF;                               // nothing selected
+#ifdef PADTRACE_FILE
+    {   // Test aid: what each port really reads, early and later on.
+        static int t = 0;
+        t++;
+        if (t <= 5 || t == 100 || t == 1000)
+        {
+            Dcreate("JOURNAUX");
+            FILE* lf = fopen("JOURNAUX\\PADS.TXT", "a");
+            if (lf) { fprintf(lf, "poll=%d portA=%04x portB=%04x idleA=%d idleB=%d pad=%04x\r\n", t, (unsigned)pp[0], (unsigned)pp[1], idle_run[0], idle_run[1], (unsigned)pad); fclose(lf); }
+        }
+    }
+#endif
     return pad;
 #else
     return 0;
@@ -227,7 +264,7 @@ void Input::poll()
     // Test aid: the first 5 values read from the enhanced ports, and whether the machine has them.
     {
         static int n = 0;
-        if (n < 5) { n++; FILE* lf = fopen("PADS.TXT", "a"); if (lf) { fprintf(lf, "ext_ports=%d pad=%04x\r\n", (int)ext_ports, (unsigned)pad); fclose(lf); } }
+        if (n < 5) { n++; Dcreate("JOURNAUX"); FILE* lf = fopen("JOURNAUX\\PADS.TXT", "a"); if (lf) { fprintf(lf, "ext_ports=%d pad=%04x\r\n", (int)ext_ports, (unsigned)pad); fclose(lf); } }
     }
 #endif
     // The joysticks are ORed on top of the keyboard so both work at once. Left/right always
@@ -290,6 +327,11 @@ void Input::poll()
     // menus and hold the accelerator, so steady-state speed can be measured.
     {
         int f = cannonball::frame;
+#ifndef AUTOPLAY_KEEPINPUT
+        // Nothing read from the real keyboard, joysticks or enhanced ports counts: on a real Falcon
+        // an unconnected port or a key can read as pressed (brake, pause), which Hatari never shows.
+        for (int k = 0; k < (int)(sizeof(keys) / sizeof(keys[0])); k++) keys[k] = false;
+#endif
         bool coin_pulse  = (f % 40) < 3 && f < 200;
         bool start_pulse = (f % 40) >= 20 && (f % 40) < 23;
         keys[COIN]  = coin_pulse;
