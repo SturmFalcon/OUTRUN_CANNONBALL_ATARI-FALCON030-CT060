@@ -66,11 +66,11 @@ fl_loop:
 | dst[i] = tab[src[i]], two pixels per long write.
 	.globl	_atari_road_copy1
 _atari_road_copy1:
-	movem.l	%d2-%d3/%a2,-(%sp)		| 12 bytes
-	move.l	16(%sp),%a0
-	move.l	20(%sp),%a1
-	move.l	24(%sp),%a2
-	move.l	28(%sp),%d1
+	movem.l	%d2-%d4/%a2,-(%sp)		| 16 bytes
+	move.l	20(%sp),%a0
+	move.l	24(%sp),%a1
+	move.l	28(%sp),%a2
+	move.l	32(%sp),%d1
 	moveq	#0,%d0
 	moveq	#0,%d2
 	move.l	%a0,%d3
@@ -85,30 +85,29 @@ _atari_road_copy1:
 	beq.s	3f
 	subq.l	#1,%d1
 c1_loop:
-	move.b	(%a1)+,%d0
+	move.b	(%a1)+,%d0			| d0/d2: upper 24 bits stay clear
 	move.b	(%a1)+,%d2
-	move.w	(%a2,%d0.w*2),%d0
-	swap	%d0
-	move.w	(%a2,%d2.w*2),%d0
-	move.l	%d0,(%a0)+
-	moveq	#0,%d0
+	move.w	(%a2,%d0.w*2),%d4
+	swap	%d4
+	move.w	(%a2,%d2.w*2),%d4
+	move.l	%d4,(%a0)+
 	dbra	%d1,c1_loop
 3:	btst	#0,%d3
 	beq.s	9f
 	move.b	(%a1)+,%d0
 	move.w	(%a2,%d0.w*2),(%a0)+
-9:	movem.l	(%sp)+,%d2-%d3/%a2
+9:	movem.l	(%sp)+,%d2-%d4/%a2
 	rts
 
 | dst[i] = lut64[s0[i]*8 + s1[i]], two pixels per long write.
 	.globl	_atari_road_copy2
 _atari_road_copy2:
-	movem.l	%d2-%d4/%a2-%a3,-(%sp)		| 20 bytes
-	move.l	24(%sp),%a0
-	move.l	28(%sp),%a1
-	move.l	32(%sp),%a2
-	move.l	36(%sp),%a3
-	move.l	40(%sp),%d1
+	movem.l	%d2-%d5/%a2-%a3,-(%sp)		| 24 bytes
+	move.l	28(%sp),%a0
+	move.l	32(%sp),%a1
+	move.l	36(%sp),%a2
+	move.l	40(%sp),%a3
+	move.l	44(%sp),%d1
 	moveq	#0,%d0
 	moveq	#0,%d2
 	move.l	%a0,%d3
@@ -121,31 +120,32 @@ _atari_road_copy2:
 	moveq	#0,%d0
 	subq.l	#1,%d1
 	beq.s	9f
-1:	move.l	%d1,%d3
+1:	move.l	%d1,%d5
 	lsr.l	#1,%d1
 	beq.s	3f
 	subq.l	#1,%d1
+	moveq	#0,%d3
 c2_loop:
-	move.b	(%a1)+,%d0
-	move.b	(%a1)+,%d2
+	| Both pixels' indices at once: s0 and s1 values are 0..7, so (s0 word << 3) | s1 word
+	| holds index A in its high byte and index B in its low byte, no carry between them.
+	move.w	(%a1)+,%d0			| d0 upper word stays clear
+	move.w	(%a2)+,%d2
 	lsl.w	#3,%d0
-	lsl.w	#3,%d2
-	add.b	(%a2)+,%d0
-	add.b	(%a2)+,%d2
+	or.w	%d2,%d0
+	move.b	%d0,%d3				| index B (d3 upper 24 bits clear)
+	lsr.w	#8,%d0				| index A
 	move.w	(%a3,%d0.w*2),%d4
 	swap	%d4
-	move.w	(%a3,%d2.w*2),%d4
+	move.w	(%a3,%d3.w*2),%d4
 	move.l	%d4,(%a0)+
-	moveq	#0,%d0
-	moveq	#0,%d2
 	dbra	%d1,c2_loop
-3:	btst	#0,%d3
+3:	btst	#0,%d5
 	beq.s	9f
 	move.b	(%a1)+,%d0
 	lsl.w	#3,%d0
 	add.b	(%a2)+,%d0
 	move.w	(%a3,%d0.w*2),(%a0)+
-9:	movem.l	(%sp)+,%d2-%d4/%a2-%a3
+9:	movem.l	(%sp)+,%d2-%d5/%a2-%a3
 	rts
 
 #else
