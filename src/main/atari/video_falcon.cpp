@@ -531,6 +531,14 @@ void Render::draw_frame(uint16_t* pixels)
 #ifdef NO_TCDIFF
     sh = 0;   // test option: the previous behaviour, whole rows written
 #endif
+    // 040/060: the per-buffer shadow copy already skips unchanged pairs at fast-RAM cost, so the
+    // whole-row comparison with the previous picture only added work (Hatari 060: 35.3 -> 35.1 ms,
+    // ROWCHECK 0 bad). -DROWCACHE_ON keeps it. The 030 keeps the row cache.
+#if (defined(__mc68040__) || defined(__mc68060__)) && !defined(ROWCACHE_ON)
+#define ROWCACHE_OFF 1
+#else
+#define ROWCACHE_OFF 0
+#endif
     uint32_t* ver = buf_ver[draw_buffer];
     const uint32_t* src32 = (const uint32_t*)pixels;
     const uint32_t* prev32 = (const uint32_t*)prev_frame;
@@ -542,11 +550,13 @@ void Render::draw_frame(uint16_t* pixels)
         if (r < r0 + lines)
         {
             const int sr = g_row_src[r];     // the drawn row this row shows (itself unless vscale < 100)
+#if !defined(NO_ROWCACHE) && !ROWCACHE_OFF
             if (g_row_draw[r] && atari_rowcmp(src32 + sr * (S16_WIDTH / 2), prev32 + sr * (S16_WIDTH / 2), S16_WIDTH / 2))
                 row_ver[sr]++;
+#endif
             need = ver[r] != row_ver[sr];
-#ifdef NO_ROWCACHE
-            need = true; // test option: convert every row every time
+#if defined(NO_ROWCACHE) || ROWCACHE_OFF
+            need = true; // every row goes through the pair diff (test option NO_ROWCACHE; default on 040/060)
 #endif
             if (need) ver[r] = row_ver[sr];
             if (need && reduced)
