@@ -76,6 +76,7 @@ pt_r:	move.w	%d0,(%a2)+
 	move.l	20(%a6),%d3
 	move.l	24(%a6),%d4
 	moveq	#0,%d6
+	moveq	#0,%d2				| 68020+: only its low byte is ever written below
 
 pc_loop:
 	move.l	%d1,%d0
@@ -85,7 +86,9 @@ pc_loop:
 pc_fetch:
 	move.l	%d1,%d0
 	lsr.l	#8,%d0
-	moveq	#0,%d2
+#if !(defined(__mc68020__) || defined(__mc68030__) || defined(__mc68040__) || defined(__mc68060__))
+	moveq	#0,%d2				| 68000: LOADT doubles d2
+#endif
 	move.b	(%a0,%d0.l),%d2
 	LOADT	%a2,%d2,%d0
 	add.w	%d0,(%a1)+
