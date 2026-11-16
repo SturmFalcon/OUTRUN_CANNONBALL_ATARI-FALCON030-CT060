@@ -27,6 +27,7 @@ G conversion réelle vers ST, H même chose vers Fast. Réponses attendues :
 | Division 16 bits | `-DSPR_DIVW` | — | [EXPÉRIMENTAL] (+4 % sous Hatari) |
 | MOVE16 lignes entières | `-DMOVE16` | — | [EXPÉRIMENTAL] |
 | MOVE16 blocs changés | `-DMOVE16_DIFF` | — | [EXPÉRIMENTAL] |
+| Cache de lignes rétabli | `-DROWCACHE_ON` | — | comparaison (retiré par défaut sur 060 : −0,6 % [H]) |
 Relevés : `render_ms`, `cost_ms` moyen / p95 / max, images en retard et sautées, répartition des niveaux AUTO.
 Critère de choix : la variante la plus rapide **et** sans retard en AUTO devient la valeur par défaut ;
 images identiques garanties par construction (mêmes routines vérifiées sous Hatari).
