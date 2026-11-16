@@ -255,7 +255,18 @@ void Input::poll()
     // Both DB9 ports count: joystick 1 (the joystick-only port) and joystick 0 (the mouse port,
     // which reports as a joystick since init() disabled the mouse). Snapshot once per poll, same
     // reason as the scan_state[] copy above.
-    joy1_state = atari_joy1 | atari_joy0;
+    // A DB9 port counts only once it has read released for IDLE_POLLS polls in a row: on the
+    // real Falcon, port 0 with the mouse still plugged in reads a fixed "down + right" (seen as
+    // joy0=0a on the CT60, 16/11/2026), i.e. brake held, and the car never moved.
+    {
+        enum { IDLE_POLLS = 25 };
+        static int idle0 = 0, idle1 = 0;
+        const uint8_t j0 = atari_joy0, j1 = atari_joy1;
+        uint8_t j = 0;
+        if (idle0 >= IDLE_POLLS) j |= j0; else idle0 = j0 ? 0 : idle0 + 1;
+        if (idle1 >= IDLE_POLLS) j |= j1; else idle1 = j1 ? 0 : idle1 + 1;
+        joy1_state = j;
+    }
 #else
     joy1_state = 0;
 #endif

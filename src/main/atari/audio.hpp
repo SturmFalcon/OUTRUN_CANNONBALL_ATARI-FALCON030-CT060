@@ -82,7 +82,17 @@ private:
     // never rewritten while it is playing (that clicks): service() hands the next queued
     // buffer over once the DMA has finished the current one.  If more than two pile up
     // (the game running faster than the sound), the oldest is dropped.
+    // DMA_CHAIN (the default; -DDMA_ONESHOT = the old way): the DMA runs in loop mode and the
+    // next buffer is written into its start/end registers while the current one plays; the
+    // hardware takes them at the end of the frame, with no gap. One more buffer for that.
+#ifndef DMA_ONESHOT
+    static const int NUM_DMA_BUFFERS = 5;
+    int armed;                   // buffer in the DMA registers for the next frame, -1 if none
+    uint32_t buf_bytes[NUM_DMA_BUFFERS];
+    uint32_t dma_pos();
+#else
     static const int NUM_DMA_BUFFERS = 4;
+#endif
     int8_t* dma_buffer[NUM_DMA_BUFFERS];
     int playing;                 // buffer being played, -1 if none
     int queue[2];                // queued buffers, oldest first

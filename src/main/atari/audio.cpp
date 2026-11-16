@@ -61,6 +61,10 @@ Audio::Audio()
     playing = -1;
     queue_len = 0;
     queued_bytes = 0;
+#ifndef DMA_ONESHOT
+    armed = -1;
+    for (int i = 0; i < NUM_DMA_BUFFERS; i++) buf_bytes[i] = 0;
+#endif
     mix_buffer = nullptr;
     wavfile.loaded = false;
     wavfile.data = nullptr;
@@ -103,7 +107,12 @@ void Audio::start_audio()
     sound_enabled = true;
     playing = 0;
     queue_len = 0;
+#ifndef DMA_ONESHOT
+    armed = -1;
+    playing = -1;                   // the first queued buffer starts the DMA (service_now())
+#else
     start_dma(dma_buffer[0], 64);   // a short burst of silence; real buffers follow via service()
+#endif
     start_irq();
 }
 
@@ -137,7 +146,11 @@ void Audio::start_dma(int8_t* buffer, uint32_t bytes)
     DMA_END_HI    = (uint8_t)(end >> 16);
     DMA_END_MID   = (uint8_t)(end >> 8);
     DMA_END_LO    = (uint8_t)(end);
+#ifndef DMA_ONESHOT
+    DMA_CTRL = 3; // on, loop: service_now() writes the next frame's addresses while this one plays
+#else
     DMA_CTRL = 1; // on, no loop - tick() re-arms each half-buffer manually
+#endif
 }
 
 // Called every game tick (see main_atari.cpp's main_loop(), same call site
@@ -226,7 +239,11 @@ void Audio::irq_step()
     else
     {
         service_now();
+#ifndef DMA_ONESHOT
+        if (queue_len + (armed >= 0 ? 1 : 0) >= 2) return;   // enough sound waiting for the DMA
+#else
         if (queue_len >= 2) return;                // enough sound waiting for the DMA
+#endif
         irq_next = now;
     }
     T_MARK(d0);
@@ -426,7 +443,11 @@ void Audio::tick_now()
     // stereo format and write into the buffer NOT currently playing.
     service_now();
     int fill_idx = 0;
-    while (fill_idx == playing || (queue_len > 0 && fill_idx == queue[0]) || (queue_len > 1 && fill_idx == queue[1]))
+    while (fill_idx == playing || (queue_len > 0 && fill_idx == queue[0]) || (queue_len > 1 && fill_idx == queue[1])
+#ifndef DMA_ONESHOT
+           || fill_idx == armed
+#endif
+          )
         fill_idx++;                                                   // the buffer nobody is using
     int8_t* fill = dma_buffer[fill_idx];
     for (uint32_t i = 0; i < frames * 2; i++)
@@ -469,6 +490,9 @@ void Audio::tick_now()
     }
     queue[queue_len++] = fill_idx;
     queued_bytes = samples * 2;
+#ifndef DMA_ONESHOT
+    buf_bytes[fill_idx] = samples * 2;
+#endif
 #ifdef UNDERRUN_LOG
     g_steps_mixed++;
 #endif
@@ -499,13 +523,63 @@ void Audio::service_now()
     }
     if (queue_len) g_starved = false;
 #endif
+#ifndef DMA_ONESHOT
+    if (!sound_enabled || dsp_replay.active() || dspmod.active()) return;
+    if (!dma_busy())
+    {
+        // Not running (start, or the DSP had the DAC): start on the oldest queued buffer, in loop mode.
+        armed = -1;
+        if (queue_len == 0) { playing = -1; return; }
+        playing = queue[0];
+        queue[0] = queue[1];
+        queue_len--;
+        dma_started++;
+        start_dma(dma_buffer[playing], buf_bytes[playing]);
+    }
+    else if (armed >= 0)
+    {
+        // Has the frame moved on to the armed buffer? Then that one plays and the registers are free.
+        const uint32_t p = dma_pos(), a = (uint32_t)dma_buffer[armed];
+        if (p >= a && p <= a + buf_bytes[armed]) { playing = armed; armed = -1; }
+    }
+    if (armed < 0 && queue_len > 0)
+    {
+        // Next frame: written now, taken by the DMA when the current frame ends (no gap).
+        armed = queue[0];
+        queue[0] = queue[1];
+        queue_len--;
+        dma_started++;
+        const uint32_t start = (uint32_t)dma_buffer[armed], end = start + buf_bytes[armed];
+        DMA_START_HI  = (uint8_t)(start >> 16);
+        DMA_START_MID = (uint8_t)(start >> 8);
+        DMA_START_LO  = (uint8_t)(start);
+        DMA_END_HI    = (uint8_t)(end >> 16);
+        DMA_END_MID   = (uint8_t)(end >> 8);
+        DMA_END_LO    = (uint8_t)(end);
+    }
+#else
     if (!sound_enabled || queue_len == 0 || dsp_replay.active() || dspmod.active() || dma_busy()) return;
     playing = queue[0];
     queue[0] = queue[1];
     queue_len--;
     dma_started++;
     start_dma(dma_buffer[playing], queued_bytes);
+#endif
 }
+
+#ifndef DMA_ONESHOT
+// Where the DMA is reading now (frame address counter), read until two reads agree.
+uint32_t Audio::dma_pos()
+{
+    volatile uint8_t* const r = (volatile uint8_t*)0xFF8909L;
+    uint32_t a, b;
+    do {
+        a = ((uint32_t)r[0] << 16) | ((uint32_t)r[2] << 8) | r[4];
+        b = ((uint32_t)r[0] << 16) | ((uint32_t)r[2] << 8) | r[4];
+    } while (a != b);
+    return a;
+}
+#endif
 
 // One game step without sound output, used by the main loop when the machine has no time to
 // synthesise: the PCM chip still runs (the game reads its end-of-sample flags) and the FM

@@ -39,7 +39,7 @@ static long measure_super()
 
 static uint32_t cycles_for(long cpu)
 {
-    if (cpu >= 60) return 16;
+    if (cpu >= 60) return 24;   // measured [RCT60] 16/11/2026: 89.9 MHz CT60 (CBCLK) gave 59.3 with 16
     if (cpu >= 40) return 18;
     return 40;
 }
