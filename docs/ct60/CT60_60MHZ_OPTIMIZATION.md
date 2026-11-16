@@ -32,14 +32,17 @@ CT60 (aucune mesure à ce jour) ; **[HYPOTHÈSE]** estimation.
 | 4 | 44189bd | sprites : chaque rangée réduite à ses pixels opaques | **40,1 ms** | **−10 %** | identiques |
 | 5 | c402bd2 | route : écritures longues alignées, remplissage déroulé ×4 (040/060) | 39,7 ms | −1 % | identiques |
 | 6 | 7f86484 | conversion couleur : deux paires par tour, comparées avant toute écriture (040/060) | 39,0 ms | −2 % | écran identique (ROWCHECK 0/2500) |
-| 7 | c34a268 | tuiles : recherche de la tuile en ligne, sans appel par colonne | **37,0 ms** | −5 % | identiques |
+| 7 | c34a268 | tuiles : recherche de la tuile en ligne, sans appel par colonne | 37,0 ms | −5 % | identiques |
+| 8 | 62db2f7 | route : les deux index de la table tirés d'un mot de chaque source | **36,5 ms** | −1,4 % | identiques |
+| — | (abandonné) | sprites : division 16 bits au lieu de 32 dans la préparation des rangées | 38,1 ms | **+4 %** | identiques ; retiré (règle « jamais plus lent ») |
 
-Total depuis la boucle adaptative : **≈ 45 → 37,0 ms par image [H] (−18 %)**, sans perte de qualité.
+Total depuis la boucle adaptative : **≈ 45 → 36,5 ms par image [H] (−19 %)**, sans perte de qualité.
 
 Cadence AUTO pleine qualité [H] :
 - avant (6f00ae3) : 14,4 i/s, presque tout à 15 i/s ;
 - après la route (c402bd2) : 16,1 i/s, 183 images à 20 i/s, 169 à 15 ;
-- après les tuiles (c34a268) : **18,2 i/s**, 323 images à 20 i/s, 52 à 15, 0 image sautée, 0 en retard.
+- après les tuiles (c34a268) : 18,2 i/s, 323 images à 20 i/s ;
+- après la route (62db2f7) : **18,3 i/s**, 331 images à 20 i/s, 45 à 15, 0 image sautée, 0 en retard.
 
 ## Profil restant [H] (après #5, avant #6 et #7)
 - conversion couleur + écriture ST (`tv_loop`) ≈ 21 %
