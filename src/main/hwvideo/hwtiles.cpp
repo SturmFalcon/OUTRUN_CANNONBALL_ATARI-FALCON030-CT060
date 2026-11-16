@@ -290,11 +290,23 @@ extern "C" void atari_tile8d(uint16_t* buf, const uint16_t* dec, const uint8_t* 
 extern "C" void atari_tile8d_mask(uint16_t* buf, const uint16_t* dec, const uint8_t* flg, uint32_t palette, uint32_t stride_bytes,
                                   uint32_t rows);
 #ifdef TILE_DEC
+typedef uint32_t __attribute__((may_alias)) u32_alias;
+// A tile whose 8 rows are all transparent (flag 0) draws nothing: no call at all.
+static inline bool tile_empty(uint32_t code)
+{
+#ifdef TILE_NOEMPTY
+    (void)code; return false;   // test option: always call the drawing routine
+#else
+    const u32_alias* f = (const u32_alias*)(tflg + (code << 3));
+    return (f[0] | f[1]) == 0;
+#endif
+}
 // Full tile: the unpacked tiles when they exist.
 #define TILE8(b, code, pal, stride) \
-    (tdec ? atari_tile8d(b, tdec + ((code) << 6), tflg + ((code) << 3), pal, stride) : atari_tile8(b, tiles + ((code) << 3), pal, stride))
+    (tdec ? (tile_empty(code) ? (void)0 : atari_tile8d(b, tdec + ((code) << 6), tflg + ((code) << 3), pal, stride)) \
+          : atari_tile8(b, tiles + ((code) << 3), pal, stride))
 #define TILE8M(b, code, pal, stride, m) \
-    (tdec ? atari_tile8d_mask(b, tdec + ((code) << 6), tflg + ((code) << 3), pal, stride, m) \
+    (tdec ? (tile_empty(code) ? (void)0 : atari_tile8d_mask(b, tdec + ((code) << 6), tflg + ((code) << 3), pal, stride, m)) \
           : atari_tile8_mask(b, tiles + ((code) << 3), pal, stride, m))
 #else
 #define TILE8(b, code, pal, stride)     atari_tile8(b, tiles + ((code) << 3), pal, stride)
