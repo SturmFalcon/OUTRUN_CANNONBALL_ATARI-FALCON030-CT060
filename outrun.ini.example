@@ -37,6 +37,20 @@ fps          = 0     # Steady picture rate between those, 10..30 (replaces caden
                      # In Hatari's 68060 at 32 MHz: 25 is reached with vscale = 50 (22-24
                      # pictures/s, game at 90-98 %), 20 almost at full detail. 0 = use cadence.
 
+vsync        = 2     # Pictures paced on the display's VBL (68040/68060 only; the 68030 keeps the
+                     # loop above, and cadence/fps then apply).
+                     # 2 = on when the display runs at 55-65 Hz (default), 1 = always, 0 = off.
+                     # The display never goes above 60 Hz. The game logic steps on the VBL, so its
+                     # speed does not depend on the picture rate.
+vrate        = 0     # With vsync: 0 = AUTO (default): measures each picture, drops a rate at once
+                     # when time runs short, climbs back after about 3 s with room to spare; never
+                     # lowers the detail. 60, 30, 20, 15 = that rate, fixed (each picture stays
+                     # exactly 1, 2, 3 or 4 VBLs on screen).
+vsync_lat    = 1     # VBLs between the end of a game step and the picture being shown (0..3).
+stpump       = 0     # 68040/68060 only, to try on a real CT60: 1..16 = the screen writes of a
+                     # picture are spread over the drawing of the next one (that many long words
+                     # at a time). 0 = off (default). Same pictures; under Hatari it only costs.
+
 # ---- Sound -------------------------------------------------------------------------------
 
 sound        = 2     # 0 = no sound at all.

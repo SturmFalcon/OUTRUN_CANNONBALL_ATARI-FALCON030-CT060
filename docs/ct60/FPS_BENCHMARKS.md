@@ -18,6 +18,8 @@ Données brutes : `/mnt/project-files/cannonball-ct60/mesures/` (dossiers datés
 | **AUTO réglé (montée : moyenne +10 %, crête dans n−1+lat VBL)** | VBL, n auto | **14,4** | 357 × 15 i/s, 36 × 12, 7 × 10, **0 retard** | 29,7 | 50,4 / 63 / 73 ms |
 | AUTO réglé, sans ombres | VBL, n auto | 14,4 | 358 × 15 i/s, 0 retard | 29,7 | 47,6 / 60 / 68 ms |
 | AUTO réglé, réglages légers | VBL, n auto | 18,5 | 336 × 20 i/s, 45 × 15, 19 × 12 | 29,7 | 34,8 / 42 / 50 ms |
+| 15 fixe, sprites réduits + route (c402bd2) | VBL, n=4 | 14,9 | 400 × 15 i/s, 1 en retard | 29,9 | 44,2 / 52 / 59 ms (rendu 39,7) |
+| **AUTO, sprites réduits + route (c402bd2)** | VBL, n auto | **16,1** | 183 × 20 i/s, 169 × 15, 36 × 12, 12 × 10, **0 retard, 0 sautée** | 29,9 | 44,6 / 53 / 59 ms |
 
 « images à durée exacte » : images restées à l'écran exactement le nombre de VBL de leur niveau (journal CADENCE) ;
 les autres sont les changements de niveau du début (AUTO part à 20 i/s sous Hatari puis descend).
@@ -29,13 +31,16 @@ légers. Forcer 60 donne plus d'images mais irrégulières ; la vitesse du jeu r
 **Attention** : les versions de mesure compilées avec `-DSTWRITE_COUNT` (compteur d'octets écrits) sont ≈ 40 %
 plus lentes au rendu ; aucun chiffre de cadence ne doit venir d'elles (B060W2, B060X/Y/Z écartés).
 
-## Répartition du coût d'une image [H] (B060P, AUTO pleine qualité)
+## Répartition du coût d'une image [H] (B060P, AUTO pleine qualité, avant les optimisations de rendu)
 - rendu de l'image (sprites, tuiles, route, conversion RGB565, écriture ST) : **≈ 46 ms**
 - une moitié de pas de jeu (logique + route CPU + vint + son) : **≈ 1,1 ms**
 - écriture ST-RAM : ≈ 72 Ko par image, dont 95 % de mots réellement changés.
 
 La cadence dépend presque entièrement du rendu. Profil par fonction (hors compteur) : sprites zoomés ≈ 33 %,
 conversion couleur + écriture ≈ 16 %, tuiles ≈ 10 %, route ≈ 9 %.
+
+Après les optimisations (c402bd2) : rendu **39,7 ms** au lieu de 45 ; profil : conversion couleur + écriture
+≈ 21 %, route ≈ 11 %, tuiles ≈ 10 %, préparation des rangées de sprites ≈ 5 %. Détail : CT60_60MHZ_OPTIMIZATION.md.
 
 ## Par scène
 Seule la scène « course, 1re étape, ligne droite puis virages » est couverte par l'autoplay. Menus, attract mode,
