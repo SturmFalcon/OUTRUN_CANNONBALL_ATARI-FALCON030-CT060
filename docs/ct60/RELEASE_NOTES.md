@@ -33,7 +33,7 @@ Version de travail, non publiée. Mesures [H] = Hatari 060/32 MHz ; rien de mesu
   à évaluer sur vraie CT60.
 
 ## Variantes expérimentales (coupées, pour la campagne CT60)
-- `-DSPR_DIVW`, `-DSPR_EARLYNONE` (sprites), `-DMOVE16`, `-DMOVE16_DIFF` (écriture écran), `stpump` (pompe).
+- `-DSPR_DIVW`, `-DSPR_EARLYNONE`, `-DSPR_OUTEXIT` (sprites), `-DMOVE16`, `-DMOVE16_DIFF` (écriture écran), `stpump` (pompe).
 
 ## Outils
 - STOVL.TOS : chevauchement écritures ST / calcul, MOVE16 seul et réparti, coût ST réel de la conversion.

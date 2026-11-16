@@ -20,6 +20,7 @@ Routine : `_atari_sprite_rows` (src/main/atari/sprite_asm030.S), appelée une fo
 | Rangées réduites à leurs pixels opaques (tables lead/last précalculées au démarrage) | [H-VALIDÉ] 44189bd | 44,2 → 40,1 ms | −10 % |
 | Division 16 bits dans la préparation de rangée (`-DSPR_DIVW`) | [EXPÉRIMENTAL] 582233f | 36,5 → 38,1 ms | +4 % sous Hatari |
 | Sortie avant toute division pour les rangées sans pixel opaque (`-DSPR_EARLYNONE`) | [EXPÉRIMENTAL] 4a7d700 | 36,5 → 36,6 ms | neutre |
+| Fin du sprite dès qu'il quitte l'image pour de bon (`-DSPR_OUTEXIT`) | [EXPÉRIMENTAL] | 35,1 → 35,1 ms | neutre, images identiques 24/24 |
 
 Les deux variantes expérimentales donnent les mêmes images ; elles seront départagées sur la vraie CT60
 (sur le papier, `divu.w` coûte environ la moitié de `divu.l` sur 68060 [HYPOTHÈSE] ; Hatari dit le contraire

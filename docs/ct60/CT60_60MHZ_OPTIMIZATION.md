@@ -48,6 +48,7 @@ CT60 (aucune mesure à ce jour) ; **[HYPOTHÈSE]** estimation.
 | 14 | | son PCM : effacement de registre sorti de la boucle | 35,3 ms | −0,3 % | son identique (PCMCHECK 0/15000) |
 | 15 | bcd0565 | conversion 040/060 : plus de comparaison de ligne entière, la copie Fast suffit | **35,1 ms** | −0,6 % | écran exact (ROWCHECK 0/4100) |
 | 11 | 4a7d700 | sprites : rangées vides quittées avant les divisions (`-DSPR_EARLYNONE`) | 36,6 ms | neutre | identiques ; [EXPÉRIMENTAL], coupé |
+| 16 | (16/11 soir) | sprites : fin du sprite dès qu'il sort de l'écran pour de bon (`-DSPR_OUTEXIT`) | 35,1 ms | neutre | identiques (24/24) ; [EXPÉRIMENTAL], coupé |
 
 Total depuis la boucle adaptative : **≈ 45 → 35,1 ms par image [H] (−22 %)**, sans perte de qualité.
 

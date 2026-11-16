@@ -27,6 +27,7 @@ sur 030, ni l'inverse.
 | `-DPUMP_NOCALLS` | retire les appels de la pompe (comparaison) |
 | `-DSPR_DIVW` | [EXPÉRIMENTAL] division 16 bits dans la préparation des rangées de sprites |
 | `-DSPR_EARLYNONE` | [EXPÉRIMENTAL] rangées de sprite sans pixel opaque quittées avant les divisions |
+| `-DSPR_OUTEXIT` | [EXPÉRIMENTAL] sprite terminé dès que ses rangées quittent l'image pour de bon (en bas en descendant, en haut en montant) |
 | `-DMOVE16` | [EXPÉRIMENTAL] lignes converties entières puis MOVE16 vers l'écran (060) |
 | `-DMOVE16_DIFF` | [EXPÉRIMENTAL] seuls les blocs de 16 octets changés, en MOVE16 (060) |
 

@@ -17,7 +17,7 @@
 
 - **Ghidra MCP** ne tourne que sur le PC du banc (Ghidra 12.1.4 isolé, la release 7.0.0 ne gère pas 12.2) ;
   pas de 68060 dans Ghidra (décodage 68040), pas d'émulation P-code en 68k.
-- **Variantes expérimentales** (`-DSPR_DIVW`, `-DSPR_EARLYNONE`, `-DMOVE16`, `-DMOVE16_DIFF`, `stpump`) : non
+- **Variantes expérimentales** (`-DSPR_DIVW`, `-DSPR_EARLYNONE`, `-DSPR_OUTEXIT`, `-DMOVE16`, `-DMOVE16_DIFF`, `stpump`) : non
   classées tant que la vraie CT60 ne les a pas mesurées.
 
 - **Build 030** : compilé, non vérifié image par image sous Hatari 030 (trop lent pour atteindre les points de
