@@ -25,7 +25,7 @@ pas l'écriture ST (bus du Falcon, ≈ 5,6 Mo/s mesurés).
 Avant les optimisations de rendu (653ed94) : ≈ 32 ms (27-41) à 60 MHz.
 
 **60 i/s** demande ≤ 16,7 ms tout compris. L'écriture ST seule en prend ≈ 13 : il faudrait un calcul de moins de
-4 ms, soit 4 fois moins qu'aujourd'hui, même à 90 MHz. Seul un fort chevauchement des écritures ST (pompe, à
+4 ms, soit près de 3 fois moins que l'estimation à 90 MHz (≈ 10 ms). Seul un fort chevauchement des écritures ST (pompe, à
 mesurer avec STOVL) pourrait changer ce constat ; sans mesure réelle, 60 i/s pleine qualité n'est pas visé.
 L'affichage ne dépasse jamais 60 Hz (règle STurm).
 
