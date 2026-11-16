@@ -20,6 +20,9 @@
 - **Variantes expérimentales** (`-DSPR_DIVW`, `-DSPR_EARLYNONE`, `-DMOVE16`, `-DMOVE16_DIFF`, `stpump`) : non
   classées tant que la vraie CT60 ne les a pas mesurées.
 
+- **Build 030** : compilé, non vérifié image par image sous Hatari 030 (trop lent pour atteindre les points de
+  comparaison en 25 min) ; son code de jeu modifié est commun avec le 060, vérifié.
+
 ## Corrigé sur cette branche
 - **Pixels faux avec la boucle VBL** (6e12bf0) : le tampon du jeu était écrit dans `screenpt` ($45E), et TOS
   rechargeait l'adresse au mauvais moment ; 220 images fausses sur 500 [H]. Désormais seuls les registres Videl
