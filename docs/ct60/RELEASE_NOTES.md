@@ -31,5 +31,10 @@ Version de travail, non publiée. Mesures [H] = Hatari 060/32 MHz ; rien de mesu
 - `stpump` : 0 (défaut) ou 1 à 16 ; écritures écran mêlées au calcul de l'image suivante, 040/060 seulement,
   à évaluer sur vraie CT60.
 
+## Variantes expérimentales (coupées, pour la campagne CT60)
+- `-DSPR_DIVW`, `-DSPR_EARLYNONE` (sprites), `-DMOVE16`, `-DMOVE16_DIFF` (écriture écran), `stpump` (pompe).
+
 ## Outils
-- STOVL.TOS : mesure du chevauchement écritures ST / calcul sur 060.
+- STOVL.TOS : chevauchement écritures ST / calcul, MOVE16 seul et réparti, coût ST réel de la conversion.
+- tools/ct60/funcmap.py : carte des fonctions et comparaison de deux builds (objdump).
+- Analyse Ghidra MCP v0.39 / CT60 (via le PC du banc) : GHIDRA_*.md.

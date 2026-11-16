@@ -25,6 +25,10 @@ sur 030, ni l'inverse.
 | `-DSTWRITE_COUNT` | compte les octets écrits en ST ; **ralentit le rendu d'environ 40 % : jamais pour chronométrer** |
 | `-DSPR_NOTRIM` | sprites sans réduction des rangées (comparaison) |
 | `-DPUMP_NOCALLS` | retire les appels de la pompe (comparaison) |
+| `-DSPR_DIVW` | [EXPÉRIMENTAL] division 16 bits dans la préparation des rangées de sprites |
+| `-DSPR_EARLYNONE` | [EXPÉRIMENTAL] rangées de sprite sans pixel opaque quittées avant les divisions |
+| `-DMOVE16` | [EXPÉRIMENTAL] lignes converties entières puis MOVE16 vers l'écran (060) |
+| `-DMOVE16_DIFF` | [EXPÉRIMENTAL] seuls les blocs de 16 octets changés, en MOVE16 (060) |
 
 ## Vérifier qu'un build de référence v0.39 est intact
 Tag v0.39-beta, même commande : CB030.TOS md5 `9ea0b6869f5e5fa12fb60689a626aa2d`,

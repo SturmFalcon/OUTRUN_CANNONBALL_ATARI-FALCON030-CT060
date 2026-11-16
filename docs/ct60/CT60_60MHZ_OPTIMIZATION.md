@@ -6,6 +6,13 @@ Branche `ct60-60mhz-optimization` du fork de STurm. Référence immuable : **v0.
 Tags : **[H]** mesuré sous Hatari (060 à 32 MHz, cpu-exact, VGA, EmuTOS 1.3) ; **[RCT60]** mesuré sur la vraie
 CT60 (aucune mesure à ce jour) ; **[HYPOTHÈSE]** estimation.
 
+## Classement
+- [H-VALIDÉ] : #1, #2, #4 à #8 (actifs par défaut).
+- [EXPÉRIMENTAL] : #3 pompe (`stpump`), #9, #10, #11, `-DMOVE16` (coupés ; départagés sur la vraie CT60).
+- [RCT60-VALIDÉ] : aucun à ce jour.
+- Règle du 16/11 (STurm) : une variante plus lente sous Hatari n'est plus supprimée ; elle reste en option
+  jusqu'à la campagne matérielle.
+
 ## Règles suivies
 - Affichage jamais au-dessus de 60 Hz ; cadences 60/30/20/15 (diviseurs du VBL) ; RVB 50 Hz reste compatible.
 - Logique du jeu indépendante du rendu : sommes d'état (`-DSTATE_CRC`) identiques à v0.39 à toutes les cadences.
@@ -34,7 +41,9 @@ CT60 (aucune mesure à ce jour) ; **[HYPOTHÈSE]** estimation.
 | 6 | 7f86484 | conversion couleur : deux paires par tour, comparées avant toute écriture (040/060) | 39,0 ms | −2 % | écran identique (ROWCHECK 0/2500) |
 | 7 | c34a268 | tuiles : recherche de la tuile en ligne, sans appel par colonne | 37,0 ms | −5 % | identiques |
 | 8 | 62db2f7 | route : les deux index de la table tirés d'un mot de chaque source | **36,5 ms** | −1,4 % | identiques |
-| — | (abandonné) | sprites : division 16 bits au lieu de 32 dans la préparation des rangées | 38,1 ms | **+4 %** | identiques ; retiré (règle « jamais plus lent ») |
+| 9 | 582233f | sprites : division 16 bits (`-DSPR_DIVW`) | 38,1 ms | +4 % | identiques ; [EXPÉRIMENTAL], coupé |
+| 10 | 1e999aa | conversion : blocs de 16 octets changés en MOVE16 (`-DMOVE16_DIFF`) | 35,6 ms | −2,5 % sous Hatari | écran exact ; [EXPÉRIMENTAL], coupé (Hatari n'émule pas le bus) |
+| 11 | 4a7d700 | sprites : rangées vides quittées avant les divisions (`-DSPR_EARLYNONE`) | 36,6 ms | neutre | identiques ; [EXPÉRIMENTAL], coupé |
 
 Total depuis la boucle adaptative : **≈ 45 → 36,5 ms par image [H] (−19 %)**, sans perte de qualité.
 

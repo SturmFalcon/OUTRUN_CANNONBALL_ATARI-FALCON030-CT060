@@ -11,9 +11,13 @@
 Le niveau de départ ne décide que des ~3 premières secondes : AUTO se règle ensuite sur les temps mesurés.
 
 ## Table de la mission (hypothèse de départ, jamais présentée comme mesurée)
-60 MHz → 30 ; 66 → 30-40 ; 75 → 40 ; 80 → 40-50 ; 90 → 50-60.
-Sur écran VGA 60 Hz, 40 et 50 ne sont pas réguliers : AUTO choisira 30 ou 60. Le passage à 60 i/s demande
-qu'une image + une moitié de pas tiennent dans 16,7 ms (avec 20 % de marge pour monter).
+60 MHz → 30 ; 66 → 30-40 ; 75 → 40 ; 80 → 40-50 ; 90 → 50-60. Décision validée par STurm le 15/11 :
+seules 60/30/20/15 i/s (VGA 60 Hz) ; 40 et 50 ne sont pas proposés.
 
-## Estimation CT60 réelle [HYPOTHÈSE]
-Voir HATARI_CT60_COMPARISON.md et FPS_BENCHMARKS.md. Aucune mesure CT60 réelle de cette version à ce jour.
+## Estimation actuelle [HYPOTHÈSE] (rendu [H] 36,5 ms, calcul ÷ 2,2, écriture ST ≈ 13 ms)
+| CT60 | par image | AUTO tiendrait |
+|---|---|---|
+| 60 MHz | ≈ 28 ms (24 à 35) | 30 i/s, sauf au pire de la plage (alors 20) |
+| 75 MHz | ≈ 25 ms | 30 i/s |
+| 90 MHz | ≈ 23 ms | 30 i/s, ≈ 10 ms de marge ; 60 i/s hors de portée |
+Aucune mesure CT60 réelle de cette version à ce jour (campagne : CAMPAGNE_CT60_FINALE.md).

@@ -15,6 +15,11 @@
 - **Scènes non mesurées** : seule la 1re étape en course est couverte ; menus, attract mode, autres étapes et
   arrivée sont « non mesuré ».
 
+- **Ghidra MCP** ne tourne que sur le PC du banc (Ghidra 12.1.4 isolé, la release 7.0.0 ne gère pas 12.2) ;
+  pas de 68060 dans Ghidra (décodage 68040), pas d'émulation P-code en 68k.
+- **Variantes expérimentales** (`-DSPR_DIVW`, `-DSPR_EARLYNONE`, `-DMOVE16`, `-DMOVE16_DIFF`, `stpump`) : non
+  classées tant que la vraie CT60 ne les a pas mesurées.
+
 ## Corrigé sur cette branche
 - **Pixels faux avec la boucle VBL** (6e12bf0) : le tampon du jeu était écrit dans `screenpt` ($45E), et TOS
   rechargeait l'adresse au mauvais moment ; 220 images fausses sur 500 [H]. Désormais seuls les registres Videl
