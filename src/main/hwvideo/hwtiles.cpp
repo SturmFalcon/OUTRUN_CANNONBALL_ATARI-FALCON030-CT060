@@ -314,6 +314,7 @@ void hwtiles::render_tile_layer(uint16_t* buf, uint8_t page_index, uint8_t prior
         yScroll = (text_ram[0xf16 + (0x40 * page_index) + 0] << 8) | text_ram[0xf16 + (0x40 * page_index) + 1];
 
     uint8_t vis_mx[128];
+    uint8_t vis_off[128];      // (2 * mx) & 0x7f: the column's byte offset in its tile row
     int16_t vis_x[128];
     int nvis = 0;
     for (int mx = 0; mx < 128; mx++)
@@ -325,6 +326,7 @@ void hwtiles::render_tile_layer(uint16_t* buf, uint8_t page_index, uint8_t prior
         if (xx > -8 && xx < s16_width_noscale)
         {
             vis_mx[nvis] = (uint8_t)mx;
+            vis_off[nvis] = (uint8_t)((2 * mx) & 0x7f);
             vis_x[nvis]  = xx;
             nvis++;
         }
@@ -332,6 +334,9 @@ void hwtiles::render_tile_layer(uint16_t* buf, uint8_t page_index, uint8_t prior
 
     const int W = config.s16_width;
 
+#if !defined(TILEDEC_OLD) && !defined(TILEDEC_ASM)
+    const uint32_t bank12[2] = { (uint32_t)tile_banks[0] << 12, (uint32_t)tile_banks[1] << 12 };
+#endif
     for (int my = 0; my < 64; my++)
     {
         int16_t y = 8 * my;
@@ -347,6 +352,10 @@ void hwtiles::render_tile_layer(uint16_t* buf, uint8_t page_index, uint8_t prior
         uint32_t rowofs = (128 * my) & 0xfff;
         uint32_t base_l = 4096 * ((EffPage >> (my < 32 ? 0 : 8)) & 0x0f) + rowofs;
         uint32_t base_r = 4096 * ((EffPage >> (my < 32 ? 4 : 12)) & 0x0f) + rowofs;
+#if !defined(TILEDEC_OLD) && !defined(TILEDEC_ASM)
+        const uint8_t* const row_l = tile_ram + base_l;
+        const uint8_t* const row_r = tile_ram + base_r;
+#endif
 
         for (int k = 0; k < nvis; k++)
         {
@@ -361,6 +370,16 @@ void hwtiles::render_tile_layer(uint16_t* buf, uint8_t page_index, uint8_t prior
             uint32_t Code = Data & 0x1fff;
             Code = ((uint32_t)tile_banks[Code >> 12] << 12) | (Code & 0xfff);
             Code &= (NUM_TILES - 1);
+            if (Code == 0)
+                continue;
+            int16_t Colour = (Data >> 6) & 0x7f;
+#elif !defined(TILEDEC_ASM)
+            // The same lookup inline, with the row's two page bases and the bank words worked out
+            // once (no call per column). Code = Data & 0x1fff, its bank is bit 12 of Data.
+            uint32_t Data = *(const u16_alias*)((vis_mx[k] < 64 ? row_l : row_r) + vis_off[k]);
+            if ((Data >> 15) != priority_draw)
+                continue;
+            uint32_t Code = (bank12[(Data >> 12) & 1] | (Data & 0xfff)) & (NUM_TILES - 1);
             if (Code == 0)
                 continue;
             int16_t Colour = (Data >> 6) & 0x7f;
