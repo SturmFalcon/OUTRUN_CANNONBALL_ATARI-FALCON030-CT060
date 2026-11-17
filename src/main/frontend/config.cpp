@@ -342,7 +342,7 @@ void Config::load()
 #ifdef SOUND_RATE
     sound.rate        = SOUND_RATE; // -DSOUND_RATE=6258 for a cheaper, lo-fi mix
 #else
-    sound.rate        = 12517; // matches an STE/Falcon DMA sound rate exactly (6258/12517/25033/50066), so the engine mixes 3.5x fewer samples and no resampling is needed
+    sound.rate        = 12300; // the Falcon plays DMA rate code 1 ("12517 Hz") at 25.175 MHz/2048 = 12292 Hz: 12300 = 410 samples per 1/30 s keeps music tempo and pitch right [RCT60 CB-SND2: 300 steps 9992-10015 ms, was 10133-10208]. Hatari plays 12517 (1.9 % fast there)
 #endif
     sound.advertise   = 1;
     sound.preview     = 1;
