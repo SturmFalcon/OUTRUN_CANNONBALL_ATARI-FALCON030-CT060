@@ -59,5 +59,14 @@ static inline void perf_printf_file(const char* fmt, ...)
 #define PERF_NOW() (*(volatile uint32_t*)0x4BA)   // Atari 200Hz system counter
 #else
 #define PERF_PRINTF(...) ((void)0)
+#ifdef STAGEPROF
+// Test aid -DSTAGEPROF: the same stamps on the Timer C fine clock (26 us units), summed per stage.
+extern "C" unsigned long stage_now();
+#define PERF_NOW() ((uint32_t)stage_now())
+#else
 #define PERF_NOW() 0u
+#endif
+#endif
+#ifdef STAGEPROF
+extern uint32_t g_stage[10];   // 0 cover 1 tile values 2 sky 3 tiles 4 road 5 sprites 6 text 7 convert 8 whole draw_frame
 #endif

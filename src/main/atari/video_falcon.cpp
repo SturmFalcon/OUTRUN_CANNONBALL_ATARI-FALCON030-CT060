@@ -125,6 +125,46 @@ static void shadow_invalidate(int i)
     if (shadow[i]) std::memset(shadow[i], 0xff, S16_WIDTH * S16_HEIGHT * 2);
 }
 
+#ifdef STAGEPROF
+uint32_t g_stage[10];
+static uint16_t* g_sf_dst;     // the screen rows draw_frame() last wrote (ST-RAM)
+static int g_sf_stride;
+static const uint16_t* g_sf_pal;
+extern "C" unsigned long stage_now();
+static void stage_fill(uint16_t* dst, int stride)
+{
+    for (int r = 0; r < S16_HEIGHT; r++)
+    {
+        uint32_t* d = (uint32_t*)(dst + r * stride);
+        for (int i = 0; i < S16_WIDTH / 2; i += 4) { d[i] = r; d[i + 1] = r; d[i + 2] = r; d[i + 3] = r; }
+    }
+}
+static void convert_rows_diff(const uint16_t* src, const uint16_t* pal, uint16_t* dst, uint16_t* sh, int rows, int dst_stride);
+// Fallout-style floors: one full 320x224 picture written plainly, then converted from indices
+// without the shadow (every pair written), into ST-RAM (hidden screen) and into fast RAM.
+// Results in 26 us units for 10 pictures each.
+void stage_floors(const uint16_t* pixels, unsigned long out[4])
+{
+    uint16_t* st = g_sf_dst;
+    const int fal_stride = g_sf_stride;
+    uint16_t* fast = (uint16_t*)(((long)Mxalloc((long)S16_WIDTH * S16_HEIGHT * 2 + 32, 3) + 15) & ~15L);
+    for (int k = 0; k < 4; k++) out[k] = 0;
+    if ((long)fast <= 15 || !st || !g_sf_pal) return;
+    for (int k = 0; k < 4; k++)
+    {
+        uint16_t* d = (k & 1) ? fast : st;
+        const int stride = (k & 1) ? S16_WIDTH : fal_stride;
+        const unsigned long t = stage_now();
+        for (int n = 0; n < 10; n++)
+        {
+            if (k < 2) stage_fill(d, stride);
+            else       convert_rows_diff(pixels, g_sf_pal, d, 0, S16_HEIGHT, stride);
+        }
+        out[k] = stage_now() - t;
+    }
+}
+#endif
+
 // convert_rows(), writing only what differs from sh (the shadow copy of these destination rows).
 static void convert_rows_diff(const uint16_t* src, const uint16_t* pal, uint16_t* dst, uint16_t* sh, int rows, int dst_stride)
 {
@@ -578,6 +618,10 @@ void Render::draw_frame(uint16_t* pixels)
     uint32_t* ver = buf_ver[draw_buffer];
     const uint32_t* src32 = (const uint32_t*)pixels;
     const uint32_t* prev32 = (const uint32_t*)prev_frame;
+#ifdef STAGEPROF
+    const uint32_t tcv = PERF_NOW();
+    g_sf_dst = dst; g_sf_stride = fal_stride; g_sf_pal = rgb565;
+#endif
     int run = -1; // first row of the pending run of rows to convert
     const bool reduced = g_row_reduced != 0;
     for (int r = r0; r <= r0 + lines; r++)
@@ -612,6 +656,9 @@ void Render::draw_frame(uint16_t* pixels)
             run = -1;
         }
     }
+#ifdef STAGEPROF
+    g_stage[7] += PERF_NOW() - tcv;
+#endif
 #endif
 #ifdef PUMPCHECK
     if (g_stpump_on && pump_job) pc_longs += (uint32_t)(g_pump_end - pump_job) / 2;
@@ -682,6 +729,9 @@ void Render::draw_frame(uint16_t* pixels)
 #endif
     uint32_t t1 = PERF_NOW();
     PERF_PRINTF("DRAW tc=%lu (5ms)\r\n", (unsigned long)(t1 - t0));
+#ifdef STAGEPROF
+    g_stage[8] += t1 - t0;
+#endif
 #ifdef DUMP_FRAME
     // Test aid (-DDUMP_FRAME): write frame 30 and every 300th to FRnnnn.BIN as raw big-endian RGB565.
     static int fc = 0;

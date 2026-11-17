@@ -186,6 +186,9 @@ void Video::prepare_frame()
     else
     {
         // OutRun Hardware Video Emulation
+#ifdef STAGEPROF
+        const uint32_t tc = PERF_NOW();
+#endif
         {
             const bool fg_on = !config.engine.fix_bugs || oroad.horizon_base != ORoad::HORIZON_OFF;
             if (fg_on) hwroad.compute_cover(g_row_cover);
@@ -214,6 +217,10 @@ void Video::prepare_frame()
         uint32_t t5 = PERF_NOW();
         tile_layer->render_text_layer(pixels, 1);
         uint32_t t6 = PERF_NOW();
+#ifdef STAGEPROF
+        g_stage[0] += t0 - tc; g_stage[1] += t1 - t0; g_stage[2] += t2 - t1; g_stage[3] += t3 - t2;
+        g_stage[4] += t4 - t3; g_stage[5] += t5 - t4; g_stage[6] += t6 - t5;
+#endif
 #ifdef PERF_PRINT
         // Printed after t6: this line used to sit between t5 and t6, so the time it takes to
         // write it to the log was counted as text layer time.

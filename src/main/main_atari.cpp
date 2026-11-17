@@ -705,6 +705,11 @@ static void main_loop()
 // n instead (60, 30, 20, 15).
 // ------------------------------------------------------------------------------------------
 
+static uint32_t fine_now();
+#ifdef STAGEPROF
+extern "C" unsigned long stage_now() { return fine_now(); }
+void stage_floors(const uint16_t* pixels, unsigned long out[4]);
+#endif
 // 26.04 us units (Timer C runs from 192 down to 1 between two 200 Hz ticks). Supervisor only.
 static uint32_t fine_now()
 {
@@ -854,6 +859,9 @@ static void main_loop_vsync()
             {
                 b_hz = *hz200; b_steps = cannonball::frame;
                 if (cadlog_install()) cadlog_reset();
+#ifdef STAGEPROF
+                for (int k = 0; k < 10; k++) g_stage[k] = 0;
+#endif
             }
             else if (renders > BENCH_START)
             {
@@ -891,6 +899,25 @@ static void main_loop_vsync()
                 Dcreate("JOURNAUX");
                 FILE* bl = fopen("JOURNAUX\\CBBENCH.LOG", "a");
                 if (bl) { fprintf(bl, "%s\r\n%s\r\n%s\r\n%s\r\n", l1, l2, l3, hw); fclose(bl); }
+#ifdef STAGEPROF
+                {
+                    // us per picture = sum * 26.04 / pictures; printed x10 (0.1 ms units = sum * 260 / n / 1000)
+                    char ls[320], lf[200]; unsigned long fl[4];
+                    const unsigned long n = b_cnt ? b_cnt : 1;
+                    #define SMS(k) (unsigned long)((uint64_t)g_stage[k] * 2604 / 10000 / n)
+                    std::sprintf(ls, "STAGES ms_x10 per picture: cover=%lu tilevals=%lu sky=%lu tiles=%lu road=%lu sprites=%lu text=%lu | convert=%lu draw_frame=%lu (n=%lu)",
+                                 SMS(0), SMS(1), SMS(2), SMS(3), SMS(4), SMS(5), SMS(6), SMS(7), SMS(8), n);
+                    #undef SMS
+                    stage_floors(video.pixels, fl);
+                    // 10 pictures each: ms_x10 per picture = units * 26.04 / 10 / 100
+                    std::sprintf(lf, "FLOORS ms_x10 per full picture: write_ST=%lu write_fast=%lu convert_ST=%lu convert_fast=%lu",
+                                 (unsigned long)((uint64_t)fl[0] * 2604 / 10000 / 10), (unsigned long)((uint64_t)fl[1] * 2604 / 10000 / 10),
+                                 (unsigned long)((uint64_t)fl[2] * 2604 / 10000 / 10), (unsigned long)((uint64_t)fl[3] * 2604 / 10000 / 10));
+                    printf("%s\r\n%s\r\n", ls, lf);
+                    FILE* sf = fopen("JOURNAUX\\CBBENCH.LOG", "a");
+                    if (sf) { fprintf(sf, "%s\r\n%s\r\n", ls, lf); fclose(sf); }
+                }
+#endif
                 fflush(stdout);
                 quit_func(0);
             }
