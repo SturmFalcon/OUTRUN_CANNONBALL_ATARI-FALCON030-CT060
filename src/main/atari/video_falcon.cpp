@@ -84,6 +84,42 @@ static uint32_t pc_longs = 0;
 uint32_t g_st_longs = 0, g_st_rows = 0, g_st_words = 0;   // test aid, see convert_rows_diff()
 #endif
 
+#if defined(FPS_OSD) || defined(BENCH_N)
+// Test aid (every bench build, or -DFPS_OSD): pictures per second actually shown, measured on the
+// 200 Hz clock over half-second windows, written in the top-left corner straight into the screen
+// (3x5 digits at 2x, white on black). The shadow copy of that corner is spoiled so the next
+// conversion repaints it whatever the picture under it.
+static void draw_fps_osd(uint16_t* dst, int stride, uint16_t* sh)
+{
+    static const uint8_t DIG[11][5] = {
+        {7,5,5,5,7},{2,6,2,2,7},{7,1,7,4,7},{7,1,7,1,7},{5,5,7,1,1},
+        {7,4,7,1,7},{7,4,7,5,7},{7,1,1,1,1},{7,5,7,5,7},{7,5,7,1,7},{0,0,0,0,2} };
+    static uint32_t t0 = 0, n = 0, fps_x10 = 0;
+    const uint32_t now = *(volatile uint32_t*)0x4BAL;
+    n++;
+    if (t0 == 0) t0 = now;
+    else if (now - t0 >= 100) { fps_x10 = n * 2000 / (now - t0); n = 0; t0 = now; }
+    int d[4], k = 0;
+    const uint32_t v = fps_x10 > 999 ? 999 : fps_x10;
+    if (v >= 100) d[k++] = v / 100;
+    d[k++] = (v / 10) % 10; d[k++] = 10; d[k++] = v % 10;
+    const int X0 = 2, Y0 = 2, W = k * 8 + 2, H = 14;
+    for (int y = 0; y < H; y++)
+    {
+        uint16_t* row = dst + (Y0 + y) * stride + X0;
+        for (int x = 0; x < W; x++) row[x] = 0x0000;
+        if (sh) for (int x = 0; x < W; x++) sh[(Y0 + y) * S16_WIDTH + X0 + x] = 0xffff;
+    }
+    for (int c = 0; c < k; c++)
+        for (int r = 0; r < 5; r++)
+            for (int b = 0; b < 3; b++)
+                if (DIG[d[c]][r] & (4 >> b))
+                    for (int yy = 0; yy < 2; yy++)
+                        for (int xx = 0; xx < 2; xx++)
+                            dst[(Y0 + 2 + r * 2 + yy) * stride + X0 + 2 + c * 8 + b * 2 + xx] = 0xffff;
+}
+#endif
+
 static void shadow_invalidate(int i)
 {
     if (shadow[i]) std::memset(shadow[i], 0xff, S16_WIDTH * S16_HEIGHT * 2);
@@ -591,6 +627,10 @@ void Render::draw_frame(uint16_t* pixels)
         draw_quit_confirm(dst, fal_stride);
     if (pause_engine || g_quit_confirm)
         shadow_invalidate(draw_buffer);   // the captions are not in the copy
+#if defined(FPS_OSD) || defined(BENCH_N)
+    if (g_stpump_on) atari_st_flush();
+    draw_fps_osd(dst, fal_stride, sh);
+#endif
     if (g_take_screenshot)
     {
         // Captures exactly what draw_frame() just put together, including the PAUSE overlay
