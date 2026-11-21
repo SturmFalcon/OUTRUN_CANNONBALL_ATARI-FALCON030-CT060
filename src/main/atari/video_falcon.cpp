@@ -82,6 +82,7 @@ static uint32_t pc_longs = 0;
 #endif
 #ifdef STWRITE_COUNT
 uint32_t g_st_longs = 0, g_st_rows = 0, g_st_words = 0;   // test aid, see convert_rows_diff()
+uint32_t g_st_prev = 0, g_st_blk16 = 0, g_st_runs = 0, g_st_uni = 0, g_st_tiles = 0; // test aid (STWRITE_COUNT), see draw_frame()
 #endif
 
 #if defined(FPS_OSD) || defined(BENCH_N)
@@ -618,6 +619,42 @@ void Render::draw_frame(uint16_t* pixels)
     uint32_t* ver = buf_ver[draw_buffer];
     const uint32_t* src32 = (const uint32_t*)pixels;
     const uint32_t* prev32 = (const uint32_t*)prev_frame;
+#ifdef STWRITE_COUNT
+    // Study (21/11): longs changed against the previous picture (what a 1-picture diff would write),
+    // 16-byte blocks changed against this buffer's shadow (MOVE16 hybrid cost), runs of changed
+    // longs (bursts), uniform rows (one index), 8x8 tiles changed against the shadow.
+    if (sh && prev32)
+    {
+        for (int k = 0; k < S16_WIDTH * S16_HEIGHT / 2; k++) if (src32[k] != prev32[k]) g_st_prev++;
+        const uint32_t* a = src32; const uint32_t* b = (const uint32_t*)sh;
+        for (int r = 0; r < S16_HEIGHT; r++)
+        {
+            bool in = false, uni = true;
+            for (int k = 0; k < S16_WIDTH / 2; k++)
+            {
+                const uint32_t i = r * (S16_WIDTH / 2) + k;
+                const bool ch = a[i] != b[i];
+                if (ch && !in) g_st_runs++;
+                in = ch;
+                if (a[i] != a[r * (S16_WIDTH / 2)]) uni = false;
+            }
+            if (uni) g_st_uni++;
+            for (int k = 0; k < S16_WIDTH / 2; k += 4)
+            {
+                const uint32_t i = r * (S16_WIDTH / 2) + k;
+                if (a[i] != b[i] || a[i+1] != b[i+1] || a[i+2] != b[i+2] || a[i+3] != b[i+3]) g_st_blk16++;
+            }
+        }
+        for (int ty = 0; ty < S16_HEIGHT; ty += 8)
+            for (int tx = 0; tx < S16_WIDTH / 2; tx += 4)
+            {
+                bool ch = false;
+                for (int y = ty; y < ty + 8 && y < S16_HEIGHT && !ch; y++)
+                    for (int x = tx; x < tx + 4; x++) { const uint32_t i = y * (S16_WIDTH / 2) + x; if (a[i] != b[i]) { ch = true; break; } }
+                if (ch) g_st_tiles++;
+            }
+    }
+#endif
 #ifdef STAGEPROF
     const uint32_t tcv = PERF_NOW();
     g_sf_dst = dst; g_sf_stride = fal_stride; g_sf_pal = rgb565;

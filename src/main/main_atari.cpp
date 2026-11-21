@@ -893,6 +893,10 @@ static void main_loop_vsync()
                              (unsigned long)c.hold[4], (unsigned long)c.hold[5], (unsigned long)c.hold[6], (unsigned long)c.hold[7], (unsigned long)c.hold[8]);
                 printf("%s\r\n%s\r\n%s\r\n%s\r\n", l1, l2, l3, hw);
 #ifdef STWRITE_COUNT
+                { extern uint32_t g_st_prev, g_st_blk16, g_st_runs, g_st_uni, g_st_tiles;
+                  char lz[256]; std::sprintf(lz, "STUDY prev_pic_changed_bytes=%lu blk16_bytes=%lu runs=%lu uniform_rows=%lu tiles8x8_changed=%lu_of_1120 (per picture)",
+                      (unsigned long)(g_st_prev * 4 / renders), (unsigned long)(g_st_blk16 * 16 / renders), (unsigned long)(g_st_runs / renders), (unsigned long)(g_st_uni / renders), (unsigned long)(g_st_tiles / renders));
+                  printf("%s\r\n", lz); }
                 extern uint32_t g_st_longs, g_st_rows, g_st_words;
                 printf("STWRITE bytes_per_pic=%lu changed_word_bytes_per_pic=%lu rows_per_pic=%lu\r\n", (unsigned long)(g_st_longs * 4 / renders), (unsigned long)(g_st_words * 2 / renders), (unsigned long)(g_st_rows / renders));
 #endif
