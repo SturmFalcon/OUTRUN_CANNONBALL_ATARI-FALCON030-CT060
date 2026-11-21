@@ -634,7 +634,7 @@ static void main_loop()
                     printf("CADENCE vbls=%lu shown=%lu drawn=%d hold1=%lu hold2=%lu hold3=%lu hold4=%lu hold5=%lu hold6=%lu hold7=%lu hold8+=%lu%c%c",
                            (unsigned long)c.vbls, (unsigned long)c.shown, BENCH_N, (unsigned long)c.hold[1], (unsigned long)c.hold[2], (unsigned long)c.hold[3],
                            (unsigned long)c.hold[4], (unsigned long)c.hold[5], (unsigned long)c.hold[6], (unsigned long)c.hold[7], (unsigned long)c.hold[8], 13, 10);
-                    char hw[256]; hw_describe(hw); printf("%s%c%c", hw, 13, 10);
+                    char hw[512]; hw_describe(hw); printf("%s%c%c", hw, 13, 10);
                     printf("VSYNC on=%d hz_x100=%lu lat=%d%c%c", (int)g_vsync_on, (unsigned long)g_vsync_hz_x100, atari_opt.vsync_lat, 13, 10);
 #ifdef STWRITE_COUNT
                     extern uint32_t g_st_longs, g_st_rows, g_st_words;
@@ -879,7 +879,7 @@ static void main_loop_vsync()
                 uint32_t acc = 0, p95 = 0;
                 for (int k = 0; k < 256; k++) { acc += b_hist[k]; if (acc * 100 >= 95u * (uint32_t)b_cnt) { p95 = k; break; } }
                 CadLog c; cadlog_get(&c);
-                char hw[256]; hw_describe(hw);
+                char hw[512]; hw_describe(hw);
                 char l1[256], l2[256], l3[256];
                 std::sprintf(l1, "VBENCH pictures=%d hz200=%lu logic=%lu pics_per_s_x10=%lu cost_ms_avg_x10=%d cost_ms_p95=%lu cost_ms_max=%lu missed=%lu late=%lu render_ms_x10=%d half_ms_x10=%d",
                              BENCH_N, (unsigned long)dt, (unsigned long)(cannonball::frame - b_steps), (unsigned long)(BENCH_N * 2000UL / (dt ? dt : 1)),

@@ -104,14 +104,27 @@ void hw_detect()
 
 #ifdef HWDIAG
 // Test aid (-DHWDIAG, 68040/68060 builds): cache and processor control registers, read once.
-static unsigned long g_cacr = 0, g_pcr = 0;
+// Also the MMU translation registers (a cache mode left changed by another program shows here)
+// and the MFP interrupt enables (an interrupt source left running steals processor time).
+static unsigned long g_cacr = 0, g_pcr = 0, g_tc = 0, g_itt0 = 0, g_itt1 = 0, g_dtt0 = 0, g_dtt1 = 0, g_mfp = 0;
 static long read_ctl()
 {
     unsigned long c, p = 0;
     __asm__ volatile ("movec %%cacr,%0" : "=d"(c));
+#if defined(__mc68060__) || defined(__mc68040__)
 #if defined(__mc68060__)
     __asm__ volatile ("movec %%pcr,%0" : "=d"(p));
 #endif
+    unsigned long t, i0, i1, d0, d1;
+    __asm__ volatile ("movec %%tc,%0" : "=d"(t));
+    __asm__ volatile ("movec %%itt0,%0" : "=d"(i0));
+    __asm__ volatile ("movec %%itt1,%0" : "=d"(i1));
+    __asm__ volatile ("movec %%dtt0,%0" : "=d"(d0));
+    __asm__ volatile ("movec %%dtt1,%0" : "=d"(d1));
+    g_tc = t; g_itt0 = i0; g_itt1 = i1; g_dtt0 = d0; g_dtt1 = d1;
+#endif
+    const volatile unsigned char* mfp = (const volatile unsigned char*)0xFFFFFA00L;
+    g_mfp = ((unsigned long)mfp[0x07] << 24) | ((unsigned long)mfp[0x09] << 16) | ((unsigned long)mfp[0x13] << 8) | mfp[0x15];
     g_cacr = c; g_pcr = p;
     return 0;
 }
@@ -121,6 +134,10 @@ void hw_describe(char* buf)
 {
 #ifdef HWDIAG
     if (g_hw.cpu >= 40) Supexec(read_ctl);
+    // The same loop again, now (end of a bench run): lower than spin= at start means the processor
+    // was slowed or its time taken by interrupts during the run.
+    Supexec(measure_super);
+    const unsigned long spin_end = m_iters, spin_end_ticks = m_ticks;
 #endif
     const HwInfo& h = g_hw;
     std::sprintf(buf, "HW cpu=%ld fpu=%lx mch=%lx ct60=%d(%lx) mint=%d st_free=%ld fast_free=%ld "
@@ -130,7 +147,8 @@ void hw_describe(char* buf)
                  (unsigned long)h.spin_iters, (unsigned long)h.spin_ticks, (unsigned long)h.cycles_per_iter,
                  (unsigned long)(h.mhz_x10 / 10), (unsigned long)(h.mhz_x10 % 10), hw_profile_name(h.profile));
 #ifdef HWDIAG
-    std::sprintf(buf + __builtin_strlen(buf), " cacr=%08lx pcr=%08lx", g_cacr, g_pcr);
+    std::sprintf(buf + __builtin_strlen(buf), " spin_end=%lu/%luticks cacr=%08lx pcr=%08lx tc=%04lx itt=%08lx/%08lx dtt=%08lx/%08lx mfp_ier_imr=%08lx",
+                 spin_end, spin_end_ticks, g_cacr, g_pcr, g_tc, g_itt0, g_itt1, g_dtt0, g_dtt1, g_mfp);
 #endif
 }
 
