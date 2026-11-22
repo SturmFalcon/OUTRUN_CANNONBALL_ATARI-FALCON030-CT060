@@ -1066,6 +1066,15 @@ int main(int argc, char* argv[])
     // (video shifter, DMA sound, ...) needs supervisor mode. The returned value is the user-mode
     // stack pointer, saved so quit_func() can switch back before calling exit() - see there.
     g_user_ssp = Super(0L);
+#ifdef SND_POISON
+    // Test aid (-DSND_POISON): the state CT60MEM leaves (DMA -> DAC with the Falcon prescaler 1,
+    // 49170 Hz), set before anything else (loading the options already starts the sound), to
+    // check that the game's sound set-up no longer depends on it.
+    Devconnect(0 /* DMAPLAY */, 8 /* DAC */, 0 /* CLK25M */, 1 /* CLK50K */, 1 /* NO_SHAKE */);
+#endif
+#ifdef HWDIAG
+    hw_sound_snap(0);   // the sound subsystem as the previous program left it
+#endif
     // Test aid (-DSTARTUP_DEBUG): print a checkpoint after each startup step below,
     // so a crash during boot (e.g. a linker/multilib mismatch - see README_ATARI.md,
     // LINKCPU) can be narrowed down to the step that never printed its checkpoint.
@@ -1131,14 +1140,6 @@ int main(int argc, char* argv[])
     if (!video.init(&roms, &config.video))
         quit_func(1);
 
-#ifdef SND_POISON
-    // Test aid (-DSND_POISON): the state CT60MEM leaves (DMA -> DAC with the Falcon prescaler 1,
-    // 49170 Hz), to check that the game's sound set-up no longer depends on it.
-    Devconnect(0 /* DMAPLAY */, 8 /* DAC */, 0 /* CLK25M */, 1 /* CLK50K */, 1 /* NO_SHAKE */);
-#endif
-#ifdef HWDIAG
-    hw_sound_snap(0);
-#endif
     audio.init();
 
     input.init(config.controls.pad_id,
