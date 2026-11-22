@@ -49,6 +49,9 @@ void hw_detect();
 
 // One line of text describing g_hw (for logs). buf must hold at least 200 chars.
 void hw_describe(char* buf);
+#ifdef HWDIAG
+void hw_sound_snap(int slot);   // 0: before the game sets its sound up, 1: end of the bench run
+#endif
 
 const char* hw_profile_name(HwProfile p);
 

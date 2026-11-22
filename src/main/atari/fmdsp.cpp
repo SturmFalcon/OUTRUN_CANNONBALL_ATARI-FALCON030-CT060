@@ -82,6 +82,11 @@ bool FmDsp::start()
         return false;
     }
     Dsp_ExecProg((char*)fm_dsp_p56, (long)FM_DSP_P56_WORDS, Dsp_RequestUniqueAbility());
+#ifdef SNDHW_RESET
+    // [EXPERIMENTAL] host port interrupts off: the exchange polls, an interrupt left enabled by
+    // another program would fire for every word.
+    *(volatile uint8_t*)0xffffa200L = 0;
+#endif
 
     // set-up event: the tables, then the envelope timing; the program answers $FA5E00
     queued = 0;
@@ -236,7 +241,19 @@ const int16_t* FmDsp::step(uint32_t frames)
     if (!prev_frames) { prev_frames = frames; return 0; }
     const uint32_t expect = prev_frames * 2;
     prev_frames = frames;
+#ifdef STAGEPROF
+    {
+        // how long the DSP takes to answer (5 ms ticks): a slow DSP holds the sound interrupt
+        extern uint32_t g_dspwait_n, g_dspwait_max;
+        const uint32_t t0 = hz200();
+        if (!wait_isr(1)) { fail(); return 0; }
+        const uint32_t d = hz200() - t0;
+        if (d) g_dspwait_n++;
+        if (d > g_dspwait_max) g_dspwait_max = d;
+    }
+#else
     if (!wait_isr(1)) { fail(); return 0; }
+#endif
     const uint32_t n = (uint16_t)HOST_RX16;
     if (n == 0) return 0;
     if (n != expect) { fail(); return 0; }
@@ -249,6 +266,7 @@ const int16_t* FmDsp::step(uint32_t frames)
 }
 
 #ifdef STAGEPROF
+uint32_t g_dspwait_n = 0, g_dspwait_max = 0;
 int g_fmdsp_active() { return fmdsp.active() ? 1 : 0; }
 #endif
 #else

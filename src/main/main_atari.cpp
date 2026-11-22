@@ -638,7 +638,7 @@ static void main_loop()
                     printf("CADENCE vbls=%lu shown=%lu drawn=%d hold1=%lu hold2=%lu hold3=%lu hold4=%lu hold5=%lu hold6=%lu hold7=%lu hold8+=%lu%c%c",
                            (unsigned long)c.vbls, (unsigned long)c.shown, BENCH_N, (unsigned long)c.hold[1], (unsigned long)c.hold[2], (unsigned long)c.hold[3],
                            (unsigned long)c.hold[4], (unsigned long)c.hold[5], (unsigned long)c.hold[6], (unsigned long)c.hold[7], (unsigned long)c.hold[8], 13, 10);
-                    char hw[512]; hw_describe(hw); printf("%s%c%c", hw, 13, 10);
+                    char hw[768]; hw_describe(hw); printf("%s%c%c", hw, 13, 10);
                     printf("VSYNC on=%d hz_x100=%lu lat=%d%c%c", (int)g_vsync_on, (unsigned long)g_vsync_hz_x100, atari_opt.vsync_lat, 13, 10);
 #ifdef STWRITE_COUNT
                     extern uint32_t g_st_longs, g_st_rows, g_st_words;
@@ -872,7 +872,7 @@ static void main_loop_vsync()
                 if (cadlog_install()) cadlog_reset();
 #ifdef STAGEPROF
                 for (int k = 0; k < 10; k++) g_stage[k] = 0;
-                { extern uint32_t g_isr_calls, g_isr_steps, g_isr_time, g_isr_max; g_isr_calls = g_isr_steps = g_isr_time = g_isr_max = 0; }
+                { extern uint32_t g_isr_calls, g_isr_steps, g_isr_time, g_isr_max; g_isr_calls = g_isr_steps = g_isr_time = g_isr_max = 0; extern uint32_t g_dspwait_n, g_dspwait_max; g_dspwait_n = g_dspwait_max = 0; }
 #endif
             }
             else if (renders > BENCH_START)
@@ -899,7 +899,7 @@ static void main_loop_vsync()
                 uint32_t acc = 0, p95 = 0;
                 for (int k = 0; k < 256; k++) { acc += b_hist[k]; if (acc * 100 >= 95u * (uint32_t)b_cnt) { p95 = k; break; } }
                 CadLog c; cadlog_get(&c);
-                char hw[512]; hw_describe(hw);
+                char hw[768]; hw_describe(hw);
                 char l1[256], l2[256], l3[256];
                 std::sprintf(l1, "VBENCH pictures=%d hz200=%lu logic=%lu pics_per_s_x10=%lu cost_ms_avg_x10=%d cost_ms_p95=%lu cost_ms_max=%lu missed=%lu late=%lu render_ms_x10=%d half_ms_x10=%d",
                              BENCH_N, (unsigned long)dt, (unsigned long)(cannonball::frame - b_steps), (unsigned long)(BENCH_N * 2000UL / (dt ? dt : 1)),
@@ -948,11 +948,11 @@ static void main_loop_vsync()
                     std::sprintf(lf, "FLOORS ms_x10 per full picture: write_ST=%lu write_fast=%lu convert_ST=%lu convert_fast=%lu",
                                  (unsigned long)((uint64_t)fl[0] * 2604 / 10000 / 10), (unsigned long)((uint64_t)fl[1] * 2604 / 10000 / 10),
                                  (unsigned long)((uint64_t)fl[2] * 2604 / 10000 / 10), (unsigned long)((uint64_t)fl[3] * 2604 / 10000 / 10));
-                    extern uint32_t g_isr_calls, g_isr_steps, g_isr_time, g_isr_max;
-                    char li[200];
-                    std::sprintf(li, "SOUNDISR calls=%lu steps=%lu time_ms=%lu max_ms_x10=%lu over_s=%lu silent_frames=%lu fm_on_dsp_at_end=%d (expected ~60 calls/s, 30 steps/s)",
+                    extern uint32_t g_isr_calls, g_isr_steps, g_isr_time, g_isr_max, g_dspwait_n, g_dspwait_max;
+                    char li[300];
+                    std::sprintf(li, "SOUNDISR calls=%lu steps=%lu time_ms=%lu max_ms_x10=%lu over_s=%lu silent_frames=%lu fm_on_dsp_at_end=%d dsp_waits_ge5ms=%lu dsp_wait_max_ms=%lu (expected ~60 calls/s, 30 steps/s)",
                                  (unsigned long)g_isr_calls, (unsigned long)g_isr_steps, (unsigned long)((uint64_t)g_isr_time * 2604 / 100000),
-                                 (unsigned long)((uint64_t)g_isr_max * 2604 / 10000), (unsigned long)(dt / 200), (unsigned long)g_sil_frames_get(), g_fmdsp_active());
+                                 (unsigned long)((uint64_t)g_isr_max * 2604 / 10000), (unsigned long)(dt / 200), (unsigned long)g_sil_frames_get(), g_fmdsp_active(), (unsigned long)g_dspwait_n, (unsigned long)(g_dspwait_max * 5));
                     printf("%s\r\n%s\r\n%s\r\n", ls, lf, li);
                     FILE* sf = fopen("JOURNAUX\\CBBENCH.LOG", "a");
                     if (sf) { fprintf(sf, "%s\r\n%s\r\n%s\r\n", ls, lf, li); fclose(sf); }
@@ -1128,6 +1128,9 @@ int main(int argc, char* argv[])
     if (!video.init(&roms, &config.video))
         quit_func(1);
 
+#ifdef HWDIAG
+    hw_sound_snap(0);
+#endif
     audio.init();
 
     input.init(config.controls.pad_id,

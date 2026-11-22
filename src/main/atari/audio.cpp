@@ -13,6 +13,9 @@
 #include <mint/osbind.h>
 #include <mint/cookie.h>
 #include "atari/audio.hpp"
+#ifdef SNDHW_RESET
+#include <mint/falcon.h>
+#endif
 #include "atari/modplayer.hpp"
 #include "atari/dsp_replay.hpp"
 #include "atari/dspmod.hpp"
@@ -121,6 +124,11 @@ void Audio::start_audio()
     // Rate code 1 == 12517 Hz (see STE_RATE); bit7=0 selects stereo output
     // per the register layout assumed above.
     // DMA rate code from the engine's mix rate: 0=6258, 1=12517, 2=25033, 3=50066 Hz.
+#ifdef SNDHW_RESET
+    // [EXPERIMENTAL] Sound subsystem to its reset state first (XBIOS Sndstatus(1): matrix DMA ->
+    // DAC, DSP tristated, codec gains and modes cleared), not whatever the previous program left.
+    Sndstatus(SND_RESET);
+#endif
     DMA_MODE = (config.sound.rate < 9000) ? 0 : (config.sound.rate < 18000) ? 1 : (config.sound.rate < 37000) ? 2 : 3;
 #ifdef SND16
     DMA_MODE |= 0x40;               // 16-bit stereo

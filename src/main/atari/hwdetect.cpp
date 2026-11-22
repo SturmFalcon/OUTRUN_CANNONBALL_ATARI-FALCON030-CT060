@@ -130,6 +130,23 @@ static long read_ctl()
 }
 #endif
 
+#ifdef HWDIAG
+// The sound subsystem as found: mode ($FF8920-21), matrix and codec ($FF8930-3B), DSP host
+// port ($FFA200-03: ICR CVR ISR IVR) and the DSP host interrupt vector ($3FC).
+static unsigned char g_snd[2][18]; static unsigned long g_snd_vec[2];
+static int g_snd_slot;
+static long read_snd()
+{
+    unsigned char* d = g_snd[g_snd_slot];
+    d[0] = *(volatile unsigned char*)0xFFFF8920L; d[1] = *(volatile unsigned char*)0xFFFF8921L;
+    for (int i = 0; i < 12; i++) d[2 + i] = *(volatile unsigned char*)(0xFFFF8930L + i);
+    for (int i = 0; i < 4; i++) d[14 + i] = *(volatile unsigned char*)(0xFFFFA200L + i);
+    g_snd_vec[g_snd_slot] = *(volatile unsigned long*)0x3FCL;
+    return 0;
+}
+void hw_sound_snap(int slot) { g_snd_slot = slot; Supexec(read_snd); }
+#endif
+
 void hw_describe(char* buf)
 {
 #ifdef HWDIAG
@@ -149,6 +166,14 @@ void hw_describe(char* buf)
 #ifdef HWDIAG
     std::sprintf(buf + __builtin_strlen(buf), " spin_end=%lu/%luticks cacr=%08lx pcr=%08lx tc=%04lx itt=%08lx/%08lx dtt=%08lx/%08lx mfp_ier_imr=%08lx",
                  spin_end, spin_end_ticks, g_cacr, g_pcr, g_tc, g_itt0, g_itt1, g_dtt0, g_dtt1, g_mfp);
+    hw_sound_snap(1);
+    for (int s = 0; s < 2; s++)
+    {
+        char* o = buf + __builtin_strlen(buf);
+        o += std::sprintf(o, s ? " snd_end=" : " snd_start=");
+        for (int i = 0; i < 18; i++) o += std::sprintf(o, "%02x%s", g_snd[s][i], (i == 1 || i == 13) ? "/" : "");
+        std::sprintf(o, "/v%08lx", g_snd_vec[s]);
+    }
 #endif
 }
 
