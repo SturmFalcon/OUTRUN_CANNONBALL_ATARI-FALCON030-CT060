@@ -30,6 +30,9 @@
 #include <mint/osbind.h>
 #include <mint/basepage.h>
 #include <mint/cookie.h>
+#ifdef SND_POISON
+#include <mint/falcon.h>
+#endif
 #include "atari/hwdetect.hpp"
 #include "atari/cadlog.hpp"
 #include "atari/vsync.hpp"
@@ -1128,6 +1131,11 @@ int main(int argc, char* argv[])
     if (!video.init(&roms, &config.video))
         quit_func(1);
 
+#ifdef SND_POISON
+    // Test aid (-DSND_POISON): the state CT60MEM leaves (DMA -> DAC with the Falcon prescaler 1,
+    // 49170 Hz), to check that the game's sound set-up no longer depends on it.
+    Devconnect(0 /* DMAPLAY */, 8 /* DAC */, 0 /* CLK25M */, 1 /* CLK50K */, 1 /* NO_SHAKE */);
+#endif
 #ifdef HWDIAG
     hw_sound_snap(0);
 #endif

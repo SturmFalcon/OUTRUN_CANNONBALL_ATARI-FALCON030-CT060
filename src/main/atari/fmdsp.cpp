@@ -82,7 +82,7 @@ bool FmDsp::start()
         return false;
     }
     Dsp_ExecProg((char*)fm_dsp_p56, (long)FM_DSP_P56_WORDS, Dsp_RequestUniqueAbility());
-#ifdef SNDHW_RESET
+#if defined(SNDHW_RESET) || defined(SNDNATIVE)
     // [EXPERIMENTAL] host port interrupts off: the exchange polls, an interrupt left enabled by
     // another program would fire for every word.
     *(volatile uint8_t*)0xffffa200L = 0;

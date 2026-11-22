@@ -13,7 +13,7 @@
 #include <mint/osbind.h>
 #include <mint/cookie.h>
 #include "atari/audio.hpp"
-#ifdef SNDHW_RESET
+#if defined(SNDHW_RESET) || defined(SNDNATIVE)
 #include <mint/falcon.h>
 #endif
 #include "atari/modplayer.hpp"
@@ -128,6 +128,30 @@ void Audio::start_audio()
     // [EXPERIMENTAL] Sound subsystem to its reset state first (XBIOS Sndstatus(1): matrix DMA ->
     // DAC, DSP tristated, codec gains and modes cleared), not whatever the previous program left.
     Sndstatus(SND_RESET);
+    // DMA playback straight to the DAC, 25 MHz clock with prescaler 0: the STE-compatible rate
+    // code in $FF8921 decides the rate. A Falcon prescaler left by another program (CT60MEM
+    // leaves 1 = 49170 Hz) would play our 12292 Hz buffers 4x too fast: constant underruns.
+    Devconnect(DMAPLAY, DAC, CLK25M, CLKOLD, NO_SHAKE);
+    *(volatile uint8_t*)0xFFFF8935L = 0;
+#endif
+#ifdef SNDNATIVE
+    // [EXPERIMENTAL] The Falcon's own sound set-up, nothing taken from the previous program
+    // (CB-SNDHW1 [RCT60]: left by Rolling Thunder/CT60MEM, $FF8930-35 = 0091 0383 0101: 9.2 fps,
+    // the DSP 5-30 ms late on 937 steps, the sound interrupt 84 % of the time; a bare reset: silence):
+    // DMA playback to the DAC on the 25.175 MHz clock with the Falcon prescaler nearest the mix
+    // rate (7 = 12292 Hz, 3 = 24585 Hz), the matrix fed to the output adder, no attenuation.
+    // (A prescaler left by another program, e.g. 1 = 49170 Hz by CT60MEM, used to win over the
+    // old compatible rate code and play our buffers 4x too fast.)
+    {
+        int k = (98340 + config.sound.rate / 2) / config.sound.rate - 1;   // 25.175 MHz / 256 / (k + 1)
+        if (k < 1) k = 1;
+        if (k > 11) k = 11;
+        Sndstatus(SND_RESET);   // matrix, DSP links, codec: all cleared, then set below
+        Devconnect(DMAPLAY, DAC, CLK25M, k, NO_SHAKE);
+        Soundcmd(ADDERIN, MATIN);
+        Soundcmd(LTATTEN, 0);
+        Soundcmd(RTATTEN, 0);
+    }
 #endif
     DMA_MODE = (config.sound.rate < 9000) ? 0 : (config.sound.rate < 18000) ? 1 : (config.sound.rate < 37000) ? 2 : 3;
 #ifdef SND16
