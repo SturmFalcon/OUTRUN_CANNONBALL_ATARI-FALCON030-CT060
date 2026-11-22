@@ -54,7 +54,11 @@ public:
     // step, a silent one, or the DSP stopped answering - then stopped).
     const int16_t* step(uint32_t frames);
 
+#ifdef SND24
+    static const uint32_t MAX_FRAMES = 1024;  // the DSP's output buffers (fm_dsp24_p56.h)
+#else
     static const uint32_t MAX_FRAMES = 512;   // the DSP's output buffers
+#endif
 
 private:
     bool running;
