@@ -32,7 +32,15 @@
 #define DMA_END_HI     (*(volatile uint8_t*)0xFF890F)
 #define DMA_END_MID    (*(volatile uint8_t*)0xFF8911)
 #define DMA_END_LO     (*(volatile uint8_t*)0xFF8913)
-#define DMA_MODE       (*(volatile uint8_t*)0xFF8921) // bits0-1 rate, bit7 mono/stereo
+#define DMA_MODE       (*(volatile uint8_t*)0xFF8921) // bits0-1 rate, bit7 mono/stereo, bit6 16-bit (Falcon)
+// [EXPÉRIMENTAL] -DSND16: 16-bit stereo DMA (Falcon) instead of the STE's 8-bit stereo. The mix is
+// 16-bit already; 8 bits keep only its top byte (quantisation noise heard as a metallic, distorted
+// sound on the FM music). Twice the bytes per sample: 49 KB/s of ST-RAM writes instead of 25.
+#ifdef SND16
+#define SBPF 4
+#else
+#define SBPF 2
+#endif
 
 #ifdef AUDIO_TIMING
 static uint32_t fine_time();
@@ -96,13 +104,16 @@ void Audio::start_audio()
     // DMA sound can only read ST-RAM: allocate explicitly there (a plain new would land
     // in fast RAM when the program is flagged to use it).
     for (int i = 0; i < NUM_DMA_BUFFERS; i++)
-        dma_buffer[i] = (int8_t*)Mxalloc(DMA_BUFFER_SAMPLES * 2, 0); // stereo, 1 byte/sample/channel
+        dma_buffer[i] = (int8_t*)Mxalloc(DMA_BUFFER_SAMPLES * SBPF, 0); // stereo, 1 byte/sample/channel
     clear_buffers();
 
     // Rate code 1 == 12517 Hz (see STE_RATE); bit7=0 selects stereo output
     // per the register layout assumed above.
     // DMA rate code from the engine's mix rate: 0=6258, 1=12517, 2=25033, 3=50066 Hz.
     DMA_MODE = (config.sound.rate < 9000) ? 0 : (config.sound.rate < 18000) ? 1 : (config.sound.rate < 37000) ? 2 : 3;
+#ifdef SND16
+    DMA_MODE |= 0x40;               // 16-bit stereo
+#endif
 
     sound_enabled = true;
     playing = 0;
@@ -130,7 +141,7 @@ void Audio::clear_buffers()
 {
     if (mix_buffer) std::memset(mix_buffer, 0, DMA_BUFFER_SAMPLES * sizeof(int16_t));
     for (int i = 0; i < NUM_DMA_BUFFERS; i++)
-        if (dma_buffer[i]) std::memset(dma_buffer[i], 0, DMA_BUFFER_SAMPLES * 2);
+        if (dma_buffer[i]) std::memset(dma_buffer[i], 0, DMA_BUFFER_SAMPLES * SBPF);
 }
 
 // Programs the DMA start and end addresses for `bytes` bytes of 8-bit stereo at `buffer` and
@@ -463,13 +474,17 @@ void Audio::tick_now()
         if (mix > SHRT_MAX) mix = SHRT_MAX;
         else if (mix < SHRT_MIN) mix = SHRT_MIN;
 
+#ifdef SND16
+        ((int16_t*)fill)[i] = (int16_t)mix;
+#else
         fill[i] = (int8_t)(mix >> 8); // 16-bit -> 8-bit
+#endif
     }
 
 #ifdef AUDIO_DUMP
     // Test aid: appends what this step hands to the DMA (signed 8-bit, L,R interleaved, at the
     // mixing rate) to AUDIO.RAW, so the sound can be listened to outside the emulator.
-    { FILE* df = fopen("AUDIO.RAW", "ab"); if (df) { fwrite(fill, 1, frames * 2, df); fclose(df); } }
+    { FILE* df = fopen("AUDIO.RAW", "ab"); if (df) { fwrite(fill, 1, frames * SBPF, df); fclose(df); } }
     { FILE* df = fopen("FM.RAW", "ab"); if (df) { fwrite(ym_buffer, 2, frames * 2, df); fclose(df); } }   // the FM part alone (16-bit)
 #endif
     uint32_t a3 = PERF_NOW();
@@ -489,9 +504,9 @@ void Audio::tick_now()
         queue_len = 1;
     }
     queue[queue_len++] = fill_idx;
-    queued_bytes = samples * 2;
+    queued_bytes = samples * SBPF;
 #ifndef DMA_ONESHOT
-    buf_bytes[fill_idx] = samples * 2;
+    buf_bytes[fill_idx] = samples * SBPF;
 #endif
 #ifdef UNDERRUN_LOG
     g_steps_mixed++;
