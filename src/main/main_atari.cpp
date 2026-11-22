@@ -58,6 +58,10 @@ extern "C" long __stksize = 262144L;
 #include "atari/dsp_replay.hpp"
 #include "atari/dspmod.hpp"
 #include "atari/fmdsp.hpp"
+#ifdef AUTOPLAY_CRASH
+#include "engine/ocrash.hpp"
+static uint32_t c_pics = 0, c_max = 0, c_n = 0, c_events = 0; static double c_sum = 0, n_sum = 0; static bool c_was = false;
+#endif
 
 void atari_redraw_desktop();   // atari/gemredraw.cpp
 
@@ -880,6 +884,14 @@ static void main_loop_vsync()
                 b_rsum += cost * 1000.0 / 38400.0; b_cnt++;
                 b_r += r * 1000.0 / 38400.0; b_h += (g1 - g0) * 1000.0 / 38400.0 / n;
                 b_lvl[n]++;
+#ifdef AUTOPLAY_CRASH
+                {
+                    const bool cr = ocrash.crash_state != 0;
+                    if (cr) { c_pics++; c_sum += cost * 1000.0 / 38400.0; if (ms > c_max) c_max = ms; if (!c_was) c_events++; }
+                    else    { c_n++; n_sum += cost * 1000.0 / 38400.0; }
+                    c_was = cr;
+                }
+#endif
             }
             if (renders == BENCH_START + BENCH_N)
             {
@@ -911,6 +923,17 @@ static void main_loop_vsync()
                 Dcreate("JOURNAUX");
                 FILE* bl = fopen("JOURNAUX\\CBBENCH.LOG", "a");
                 if (bl) { fprintf(bl, "%s\r\n%s\r\n%s\r\n%s\r\n", l1, l2, l3, hw); fclose(bl); }
+#ifdef AUTOPLAY_CRASH
+                {
+                    char lc[256];
+                    std::sprintf(lc, "CRASH traffic=%d crashes=%lu crash_pics=%lu crash_cost_ms_avg_x10=%d crash_cost_ms_max=%lu other_pics=%lu other_cost_ms_avg_x10=%d",
+                                 config.engine.dip_traffic, (unsigned long)c_events, (unsigned long)c_pics, (int)(c_sum * 10 / (c_pics ? c_pics : 1)), (unsigned long)c_max,
+                                 (unsigned long)c_n, (int)(n_sum * 10 / (c_n ? c_n : 1)));
+                    printf("%s\r\n", lc);
+                    FILE* cf = fopen("JOURNAUX\\CBBENCH.LOG", "a");
+                    if (cf) { fprintf(cf, "%s\r\n", lc); fclose(cf); }
+                }
+#endif
 #ifdef STAGEPROF
                 {
                     // us per picture = sum * 26.04 / pictures; printed x10 (0.1 ms units = sum * 260 / n / 1000)
@@ -1066,6 +1089,11 @@ int main(int argc, char* argv[])
 #endif
 
     config.load(); // hardcoded defaults, no XML (see frontend/config.cpp)
+#ifdef AUTOPLAY_CRASH
+    // Test aid (-DAUTOPLAY_CRASH, with -DAUTOPLAY): heaviest scenes, the most traffic the
+    // arcade allows (DIP "hardest") and crashes with the zoomed flipping car (input.cpp).
+    config.engine.dip_traffic = 3;
+#endif
 #ifdef STARTUP_DEBUG
     printf("DEBUG C: after config.load()%c%c", 13, 10);
 #endif

@@ -351,6 +351,11 @@ void Input::poll()
         keys[COIN]  = coin_pulse;
         keys[START] = start_pulse;
         keys[ACCEL] = f > 10;
+#ifdef AUTOPLAY_CRASH
+        // ... and, every 400 steps once at speed, steer hard right for 90 steps: at full speed
+        // the car leaves the road and hits the roadside scenery or a car (the zoomed crash).
+        keys[RIGHT] = f > 900 && (f % 400) < 90;
+#endif
 #ifdef AUTOPLAY_GRASS
         // ... and steer off the road, onto the grass
         keys[LEFT] = f > 700 && (f % 300) < 120;
