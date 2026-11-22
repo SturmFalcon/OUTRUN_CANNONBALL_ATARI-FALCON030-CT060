@@ -14,7 +14,11 @@ FmDsp fmdsp;
 #include <mint/falcon.h>
 #include <mint/cookie.h>
 #include "hwaudio/ym2151.hpp"
+#ifdef SND24
+#include "atari/fm_dsp24_p56.h"   // [EXPÉRIMENTAL] 1024-frame output buffers (24585 Hz)
+#else
 #include "atari/fm_dsp_p56.h"
+#endif
 #include <cstdio>
 
 // The emulation's state (hwaudio/ym2151.cpp) and the tables the DSP program needs.
@@ -244,6 +248,9 @@ const int16_t* FmDsp::step(uint32_t frames)
     return out;
 }
 
+#ifdef STAGEPROF
+int g_fmdsp_active() { return fmdsp.active() ? 1 : 0; }
+#endif
 #else
 // Host builds (tools, tests): no DSP.
 bool FmDsp::start() { return false; }

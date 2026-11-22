@@ -708,6 +708,13 @@ static void main_loop()
 static uint32_t fine_now();
 #ifdef STAGEPROF
 extern "C" unsigned long stage_now() { return fine_now(); }
+#ifdef LOOP_SILENCE
+extern uint32_t g_sil_frames;
+static unsigned long g_sil_frames_get() { return g_sil_frames; }
+#else
+static unsigned long g_sil_frames_get() { return 0xffffffffUL; }   // option not built in
+#endif
+extern int g_fmdsp_active();
 void stage_floors(const uint16_t* pixels, unsigned long out[4]);
 #endif
 // 26.04 us units (Timer C runs from 192 down to 1 between two 200 Hz ticks). Supervisor only.
@@ -861,6 +868,7 @@ static void main_loop_vsync()
                 if (cadlog_install()) cadlog_reset();
 #ifdef STAGEPROF
                 for (int k = 0; k < 10; k++) g_stage[k] = 0;
+                { extern uint32_t g_isr_calls, g_isr_steps, g_isr_time, g_isr_max; g_isr_calls = g_isr_steps = g_isr_time = g_isr_max = 0; }
 #endif
             }
             else if (renders > BENCH_START)
@@ -917,9 +925,14 @@ static void main_loop_vsync()
                     std::sprintf(lf, "FLOORS ms_x10 per full picture: write_ST=%lu write_fast=%lu convert_ST=%lu convert_fast=%lu",
                                  (unsigned long)((uint64_t)fl[0] * 2604 / 10000 / 10), (unsigned long)((uint64_t)fl[1] * 2604 / 10000 / 10),
                                  (unsigned long)((uint64_t)fl[2] * 2604 / 10000 / 10), (unsigned long)((uint64_t)fl[3] * 2604 / 10000 / 10));
-                    printf("%s\r\n%s\r\n", ls, lf);
+                    extern uint32_t g_isr_calls, g_isr_steps, g_isr_time, g_isr_max;
+                    char li[200];
+                    std::sprintf(li, "SOUNDISR calls=%lu steps=%lu time_ms=%lu max_ms_x10=%lu over_s=%lu silent_frames=%lu fm_on_dsp_at_end=%d (expected ~60 calls/s, 30 steps/s)",
+                                 (unsigned long)g_isr_calls, (unsigned long)g_isr_steps, (unsigned long)((uint64_t)g_isr_time * 2604 / 100000),
+                                 (unsigned long)((uint64_t)g_isr_max * 2604 / 10000), (unsigned long)(dt / 200), (unsigned long)g_sil_frames_get(), g_fmdsp_active());
+                    printf("%s\r\n%s\r\n%s\r\n", ls, lf, li);
                     FILE* sf = fopen("JOURNAUX\\CBBENCH.LOG", "a");
-                    if (sf) { fprintf(sf, "%s\r\n%s\r\n", ls, lf); fclose(sf); }
+                    if (sf) { fprintf(sf, "%s\r\n%s\r\n%s\r\n", ls, lf, li); fclose(sf); }
                 }
 #endif
                 fflush(stdout);

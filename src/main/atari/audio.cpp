@@ -36,6 +36,12 @@
 // [EXPÉRIMENTAL] -DSND16: 16-bit stereo DMA (Falcon) instead of the STE's 8-bit stereo. The mix is
 // 16-bit already; 8 bits keep only its top byte (quantisation noise heard as a metallic, distorted
 // sound on the FM music). Twice the bytes per sample: 49 KB/s of ST-RAM writes instead of 25.
+#ifdef LOOP_SILENCE
+static int8_t* sil_buf = 0;
+static uint32_t sil_bytes = 0;
+static bool sil_armed = false;
+uint32_t g_sil_frames = 0;   // silent frames played because the sound was late (test aid)
+#endif
 #ifdef SND16
 #define SBPF 4
 #else
@@ -106,6 +112,11 @@ void Audio::start_audio()
     for (int i = 0; i < NUM_DMA_BUFFERS; i++)
         dma_buffer[i] = (int8_t*)Mxalloc(DMA_BUFFER_SAMPLES * SBPF, 0); // stereo, 1 byte/sample/channel
     clear_buffers();
+#ifdef LOOP_SILENCE
+    if (!sil_buf) sil_buf = (int8_t*)Mxalloc(DMA_BUFFER_SAMPLES * SBPF, 0);
+    if ((long)sil_buf <= 0) sil_buf = 0; else std::memset(sil_buf, 0, DMA_BUFFER_SAMPLES * SBPF);
+    sil_armed = false;
+#endif
 
     // Rate code 1 == 12517 Hz (see STE_RATE); bit7=0 selects stereo output
     // per the register layout assumed above.
@@ -186,7 +197,23 @@ void Audio::tick()
 // things shared with it are guarded by atari_sound_lock() / atari_sound_unlock().
 // --------------------------------------------------------------------------
 extern "C" void sound_isr();            // sound_asm.S: Timer B, calls sound_isr_step()
+#ifdef STAGEPROF
+// Test aid (with STAGEPROF): what the sound interrupt costs. Calls, steps made, time inside
+// (26 us units) and the longest call, read by main_atari.cpp at the end of a bench run.
+extern "C" unsigned long stage_now();
+uint32_t g_isr_calls = 0, g_isr_steps = 0, g_isr_time = 0, g_isr_max = 0, g_isr_fmfail = 0;
+extern "C" void sound_isr_step()
+{
+    const uint32_t t0 = stage_now();
+    const uint32_t before = g_isr_steps;
+    cannonball::audio.irq_step();
+    const uint32_t dt = stage_now() - t0;
+    g_isr_calls++; g_isr_time += dt; if (dt > g_isr_max) g_isr_max = dt;
+    (void)before;
+}
+#else
 extern "C" void sound_isr_step() { cannonball::audio.irq_step(); }
+#endif
 
 static void (*old_timer_b)() = 0;
 static int lock_depth = 0;
@@ -257,6 +284,9 @@ void Audio::irq_step()
 #endif
         irq_next = now;
     }
+#ifdef STAGEPROF
+    { extern uint32_t g_isr_steps; g_isr_steps++; }
+#endif
     T_MARK(d0);
     fm_before_driver();
     osoundint.tick();
@@ -557,7 +587,32 @@ void Audio::service_now()
         const uint32_t p = dma_pos(), a = (uint32_t)dma_buffer[armed];
         if (p >= a && p <= a + buf_bytes[armed]) { playing = armed; armed = -1; }
     }
+#ifdef LOOP_SILENCE
+    // [EXPÉRIMENTAL] -DLOOP_SILENCE: in loop mode the DMA plays its current frame again when no
+    // next one was written in time (sound late: the same 1/30 s repeated, heard as a metallic,
+    // "under water" sound). Here a frame of silence is armed instead whenever nothing is queued.
+    else if (sil_armed)
+    {
+        const uint32_t p = dma_pos(), a = (uint32_t)sil_buf;
+        if (p >= a && p <= a + sil_bytes) { playing = -1; sil_armed = false; g_sil_frames++; }
+    }
+    if (armed < 0 && !sil_armed && queue_len == 0 && sil_buf)
+    {
+        sil_bytes = buf_bytes[playing >= 0 ? playing : 0];
+        if (!sil_bytes) sil_bytes = 2 * 410;
+        const uint32_t start = (uint32_t)sil_buf, end = start + sil_bytes;
+        DMA_START_HI  = (uint8_t)(start >> 16);
+        DMA_START_MID = (uint8_t)(start >> 8);
+        DMA_START_LO  = (uint8_t)(start);
+        DMA_END_HI    = (uint8_t)(end >> 16);
+        DMA_END_MID   = (uint8_t)(end >> 8);
+        DMA_END_LO    = (uint8_t)(end);
+        sil_armed = true;
+    }
+    if (armed < 0 && !sil_armed && queue_len > 0)
+#else
     if (armed < 0 && queue_len > 0)
+#endif
     {
         // Next frame: written now, taken by the DMA when the current frame ends (no gap).
         armed = queue[0];
